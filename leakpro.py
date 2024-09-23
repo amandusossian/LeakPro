@@ -23,6 +23,7 @@ from leakpro.dev_utils.data_preparation import (
     prepare_train_test_datasets,
 )
 from leakpro.reporting.utils import prepare_priavcy_risk_report
+from leakpro.reporting.report_handler import report_handler
 from leakpro.user_inputs.cifar10_input_handler import Cifar10InputHandler
 
 
@@ -62,7 +63,7 @@ def generate_user_input(configs: dict, logger: logging.Logger)->None:
     """Generate user input for the target model."""
     # ------------------------------------------------
 
-    retrain = False
+    retrain = True
     # Create the population dataset and target_model
     if configs["data"]["dataset"] == "adult":
         population = get_adult_dataset(configs["data"]["dataset"], configs["data"]["data_dir"], logger)
@@ -132,14 +133,35 @@ if __name__ == "__main__":
     attack_scheduler = AttackScheduler(handler)
     audit_results = attack_scheduler.run_attacks()
 
+    # Initiate report handler
+    ReportHandler = report_handler(report_dir=report_dir, logger=logger)
+
     for attack_name in audit_results:
         logger.info(f"Preparing results for attack: {attack_name}")
 
+        # print(configs["audit"])
+        # print(configs["audit"]["attack_list"])
+
+        # Save results to be used later
+        # ReportHandler.save_results(
+        #     attack_name=attack_name,
+        #     result_data=audit_results[attack_name]["result_object"],
+        #     config=configs["audit"]
+        #     )
         prepare_priavcy_risk_report(
                 audit_results[attack_name]["result_object"],
                 configs["audit"],
                 save_path=f"{report_dir}/{attack_name}",
             )
+
+    # Create report from the saved results
+    # ReportHandler.load_results()
+    # ReportHandler.create_results_all()
+    # ReportHandler.create_results_strong()
+    # ReportHandler.create_results_attackname_grouped()
+    # ReportHandler.create_results_numshadowmodels()
+    # ReportHandler.create_report()
+
     # ------------------------------------------------
     # Save the configs and user_configs
     config_log_path = configs["audit"]["config_log"]
