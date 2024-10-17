@@ -3,6 +3,7 @@
 import torch
 from torch import cuda, device, optim, sigmoid
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss
+from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -18,17 +19,20 @@ class TABInputHandler(AbstractInputHandler):
     def get_criterion(self)->None:
         """Set the CrossEntropyLoss for the model."""
         # TODO: Implement the correct loss function for the model
-        # Assuming that the output is the probabilities of the differenent classes, 
+        # Assuming that the output is the probabilities of the different classes, 
         # cross entropy loss feels like a good starting point to investigate.
-        # Later on, maybe look at BCE if we say adversary only has access to masking decisions.
-        return CrossEntropyLoss()
 
+        if cuda.is_available():
+            return CrossEntropyLoss(ignore_index=-1, weight=torch.Tensor([1.0, 10.0, 10.0]).cuda())
+        else:
+            return CrossEntropyLoss(ignore_index=-1, weight=torch.Tensor([1.0, 10.0, 10.0]))
+        
     def get_optimizer(self, model:torch.nn.Module) -> None:
         """Set the optimizer for the model."""
         # TODO: Evaluate which model optimizer to use, but adam is prolly good
-        learning_rate = 0.1
-        momentum = 0.8
-        return optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+        learning_rate = 2e-5
+        epsilon = 1e-8
+        return AdamW(model.parameters(), lr=learning_rate, eps=epsilon)
 
     def train(
         self,
@@ -41,42 +45,33 @@ class TABInputHandler(AbstractInputHandler):
         """Model training procedure."""
 
         dev = device("cuda" if cuda.is_available() else "cpu")
+        
         model.to(dev)
         model.train()
 
         criterion = self.get_criterion()
-        optimizer = self.get_optimizer(model)
+        optimizer = self.get_optimizer()
         
+
+        train_acc, train_loss = 0.0, 0.0
+        # Training loop
         for e in tqdm(range(epochs), desc="Training Progress"):
-            model.train() # Why is this here? We're not changing it in the loop
-            train_acc, train_loss = 0.0, 0.0
             
-            for data, target in dataloader:
-                target = target.float().unsqueeze(1)
-                data, target = data.to(dev, non_blocking=True), target.to(dev, non_blocking=True)
+            model.train()    
+            for X in tqdm.tqdm(dataloader):
+                y = X['labels']
                 optimizer.zero_grad()
-                output = model(data)
-
-                loss = criterion(output, target)
-                
-                
-                # TODO: Adjust prediction, based on classification rather than binary?
-                # done?
-
-                # For adult dataset, they select the class with the highest probability as the prediction
-                # pred = sigmoid(output) >= 0.5
-                
-                # For the TAB text dataset, our prediction should/could be the class/entity
-                # with the highest probability insted (i.e. the argmax of the output.)
-                pred = output.argmax(dim=1)
-                
-
-                train_acc += pred.eq(target).sum().item()
-                
+                y_pred = model(X)
+                y_pred = y_pred.permute(0,2,1)
+                loss = criterion(y_pred, y)
                 loss.backward()
                 optimizer.step()
+                train_acc += y_pred.eq(y).sum().item()
                 train_loss += loss.item()
-        
+
+            print('Epoch', int(e + 1), "done.")
+            print('Avg training loss: {0:.2f}'.format(train_loss/(len(dataloader.dataset)*(e+1))))
+
         train_acc = train_acc/len(dataloader.dataset)
         train_loss = train_loss/len(dataloader)
 

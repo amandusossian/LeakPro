@@ -34,10 +34,10 @@ audit:  # Configurations for auditing
 target:
   # Target model path
   module_path: "utils/tabds_model_preparation.py"
-  model_class: "TABBert" 
+  model_class: "TABBERT" 
   # Data paths
   target_folder: "./target"
-  data_path: "./data/tabds_data.pkl"
+  data_path: "./utils/tab_data/tabds_train.pkl"
 
 shadow_model:
   
