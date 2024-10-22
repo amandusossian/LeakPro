@@ -58,7 +58,7 @@ class TABInputHandler(AbstractInputHandler):
         for e in tqdm(range(epochs), desc="Training Progress"):
             
             model.train()    
-            for X in tqdm.tqdm(dataloader):
+            for X in tqdm(dataloader):
                 y = X['labels']
                 optimizer.zero_grad()
                 y_pred = model(X)

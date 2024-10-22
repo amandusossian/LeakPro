@@ -8,13 +8,16 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler, OneHotEncoder
 from sklearn.model_selection import train_test_split
 import urllib.request
 from torch.utils.data import Dataset, Subset, DataLoader
-from torch import tensor, float32, cuda
+from torch import tensor, float32, cuda, LongTensor, Tensor, long
 from typing import List,Any
 from dataclasses import dataclass
-from transformers import PreTrainedTokenizerFast
+from transformers import LongformerTokenizerFast, PreTrainedTokenizerFast
+from itertools import product
+from transformers import BatchEncoding
+from tokenizers import Encoding
 
 
-device = 'cuda' if cuda.is_available() else 'cpu'
+dev = 'cuda' if cuda.is_available() else 'cpu'
 
 IntList = List[int] # A list of token_ids
 IntListList = List[IntList] # A List of List of token_ids, e.g. a Batch
@@ -34,7 +37,7 @@ class LabelSet:
         self.labels_to_id["O"] = 0
         self.ids_to_label[0] = "O"
         num = 0 
-        for _num, (label, s) in enumerate(itertools.product(labels, "BI")):
+        for _num, (label, s) in enumerate(product(labels, "BI")):
             num = _num + 1
             l = f"{s}-{label}"
             self.labels_to_id[l] = num
@@ -55,7 +58,7 @@ class TABDataset(Dataset):
             window_stride=None,
         ):
             self.label_set = label_set
-            
+            self.tokens_per_batch = tokens_per_batch
             self.window_stride = tokens_per_batch if window_stride is None else window_stride
             self.tokenizer = tokenizer
         
@@ -134,8 +137,23 @@ class TABDataset(Dataset):
         return len(self.training_examples)
 
 
-    def __getitem__(self, idx):
-        return self.training_examples[idx]
+    def __getitem__(self, idx) -> dict:
+        # Retrieve the TrainingExample from the dataset
+        ex = self.training_examples[idx]
+
+        # Convert fields to tensors (do the padding if necessary)
+        input_ids = tensor(ex.input_ids, dtype=long).to(dev)
+        attention_masks = tensor(ex.attention_masks, dtype=long).to(dev)
+        labels = tensor(ex.labels, dtype=long).to(dev)
+
+        # You can return other fields like identifier_types, offsets, etc.
+        return {
+            'input_ids': input_ids,
+            'attention_masks': attention_masks,
+            'labels': labels,
+            'identifier_types': ex.identifier_types,  # Leave as list if necessary
+            'offsets': ex.offsets  # Leave as list if necessary
+        }
 
 
     def subset(self, indices):
@@ -145,6 +163,7 @@ class TABDataset(Dataset):
         subset_data = TABDataset.__new__(TABDataset)  # Bypass __init__
 
         # Directly subset the relevant fields from the original dataset
+      
         subset_data.texts = [self.texts[i] for i in indices]
         subset_data.annotations = [self.annotations[i] for i in indices]
         subset_data.training_examples = [self.training_examples[i] for i in indices]
@@ -183,76 +202,35 @@ def download_tab_dataset(data_dir):
         urllib.request.urlretrieve(base_url + "adult.test", test_file)
 '''
 
-def preprocess_tab_dataset(datapath):
+def preprocess_tab_dataset(datapath, create_new = False):
     """Get the dataset, download it if necessary, and store it."""
-    
-    if os.path.exists(datapath + "/tab_train.pkl"):
-        with open(datapath+ "/tab_train.pkl", "rb") as f:
-            dataset = joblib.load(f)
+    #bert = 'allenai/longformer-base-4096'
+    #label_set = LabelSet(labels=["MASK"])
 
+    if os.path.exists(datapath + "/tab_train_old.pkl"):
+
+        if create_new: 
+            bert = 'allenai/longformer-base-4096'
+            label_set = LabelSet(labels=["MASK"])
+            with open(datapath+ "/tab_train_old.pkl", "rb") as f:
+                dataset  = TABDataset(joblib.load(f), label_set = label_set, 
+                                     tokenizer = LongformerTokenizerFast.from_pretrained(bert),
+                                     tokens_per_batch=4096) 
+            with open(datapath+ "/tab_train_dataset.pkl", 'wb') as handle:
+                pickle.dump(dataset, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        else: 
+            with open(datapath+ "/tab_train_dataset.pkl", "rb") as f:
+                dataset = joblib.load(f)
+      
 
 
     else: 
-        print(os.path.join(path, "tab_data/tab_train.pkl"))
-        assert 1 == 2, "Don't load"
+        print(os.path.join(datapath, "tab_data/tab_train.pkl"))
+        assert 1 == 2, "Something went wrong with loading existing data."
         # TODO: Implement downloader after it is done with the first normal case
-        column_names = [
-            "age", "workclass", "fnlwgt", "education", "education-num", 
-            "marital-status", "occupation", "relationship", "race", "sex",
-            "capital-gain", "capital-loss", "hours-per-week", "native-country", "income",
-        ]
-        
-        # Load and clean data
-        df_train = pd.read_csv(os.path.join(path, "adult.data"), names=column_names)
-        df_test = pd.read_csv(os.path.join(path, "adult.test"), names=column_names, header=0)
-        df_test["income"] = df_test["income"].str.replace(".", "", regex=False)
-        
-        df_concatenated = pd.concat([df_train, df_test], axis=0)
-        df_clean = df_concatenated.replace(" ?", np.nan).dropna()
-
-        # Split features and labels
-        x, y = df_clean.iloc[:, :-1], df_clean.iloc[:, -1]
-
-        # Categorical and numerical columns
-        categorical_features = [col for col in x.columns if x[col].dtype == "object"]
-        numerical_features = [col for col in x.columns if x[col].dtype in ["int64", "float64"]]
-
-        # Scaling numerical features
-        scaler = StandardScaler()
-        x_numerical = pd.DataFrame(scaler.fit_transform(x[numerical_features]), columns=numerical_features, index=x.index)
-        
-        # Label encode the categories
-        one_hot_encoder = OneHotEncoder(sparse_output=False)
-        x_categorical_one_hot = one_hot_encoder.fit_transform(x[categorical_features])
-        one_hot_feature_names = one_hot_encoder.get_feature_names_out(categorical_features)
-        x_categorical_one_hot_df = pd.DataFrame(x_categorical_one_hot, columns=one_hot_feature_names, index=x.index)
-        
-        # Concatenate the numerical and one-hot encoded categorical features
-        x_final = pd.concat([x_numerical, x_categorical_one_hot_df], axis=1)
-
-        # Label encode the target variable
-        y = pd.Series(LabelEncoder().fit_transform(y))
-        
-        # Add numerical features to the dictionary
-        dec_to_onehot_mapping = {}
-        for i, feature in enumerate(numerical_features):
-            dec_to_onehot_mapping[i] = [x_final.columns.get_loc(feature)]  # Mapping to column index
-
-        # Add one-hot encoded features to the dictionary
-        for i, categorical_feature in enumerate(categorical_features):
-            j = i + len(numerical_features)
-            one_hot_columns = [col for col in one_hot_feature_names if col.startswith(categorical_feature)]
-            dec_to_onehot_mapping[j] = [x_final.columns.get_loc(col) for col in one_hot_columns]
-
-        #--------------------
-        # Create tensor dataset to be stored
-        x_tensor = tensor(x_final.values, dtype=float32)
-        y_tensor = tensor(y.values, dtype=float32)
-        dataset = TABDataset(x_tensor, y_tensor, dec_to_onehot_mapping, one_hot_encoded=True)
-        with open(f"{path}/adult_data.pkl", "wb") as file:
-            pickle.dump(dataset, file)
-            print(f"Save data to {path}.pkl")
     
+
     return dataset
 
 def get_tab_dataloaders(dataset, train_fraction=0.3, test_fraction=0.3):
@@ -268,20 +246,22 @@ def get_tab_dataloaders(dataset, train_fraction=0.3, test_fraction=0.3):
     train_subset = Subset(dataset, train_indices)
     test_subset = Subset(dataset, test_indices)
     
-    train_loader = DataLoader(train_subset, collate_fn = TrainingBatch, batch_size=1, shuffle=True)
-    test_loader = DataLoader(test_subset, collate_fn = TrainingBatch, batch_size=1, shuffle=False)
+    train_loader = DataLoader(train_subset, batch_size=1, shuffle=True)
+    test_loader = DataLoader(test_subset, batch_size=1, shuffle=False)
 
     return train_loader, test_loader
 
+def collate_fn(batch):
+    return TrainingBatch(batch)
 
 class TrainingBatch:
     def __getitem__(self, item):
         return getattr(self, item)
 
     def __init__(self, examples: List[TrainingExample]):
-        self.input_ids: torch.Tensor
-        self.attention_masks: torch.Tensor
-        self.labels: torch.Tensor
+        self.input_ids: Tensor
+        self.attention_masks: Tensor
+        self.labels: Tensor
         self.identifier_types: List
         self.offsets:List
         input_ids: IntListList = []
@@ -290,23 +270,55 @@ class TrainingBatch:
         identifier_types: List = []
         offsets: List = []
         for ex in examples:
-            print(dir(ex))
+            
             input_ids.append(ex.input_ids)
             masks.append(ex.attention_masks)
             labels.append(ex.labels)
             identifier_types.append(ex.identifier_types)
             offsets.append(ex.offsets)
-        self.input_ids = torch.LongTensor(input_ids)
-        self.attention_masks = torch.LongTensor(masks)
-        self.labels = torch.LongTensor(labels)
+        self.input_ids = LongTensor(input_ids)
+        self.attention_masks = LongTensor(masks)
+        self.labels = LongTensor(labels)
         self.identifier_types = identifier_types
         self.offsets = offsets
 
-        self.input_ids = self.input_ids.to(device)
-        self.attention_masks = self.attention_masks.to(device)
-        self.labels = self.labels.to(device)
+        self.input_ids = self.input_ids.to(dev)
+        self.attention_masks = self.attention_masks.to(dev)
+        self.labels = self.labels.to(dev)
 
-if False:
-    tabdata = preprocess_tab_dataset("./")
-    train_l, test_l = get_tab_dataloaders(tabdata)
+def align_tokens_and_annotations_bilou(tokenized: Encoding, annotations, ids):
+    tokens = tokenized.tokens
+    identifier_types = ["O"] * len(
+        tokens
+    )
+    aligned_labels = ["O"] * len(
+        tokens
+    )
+    offsets = ["O"] * len(
+        tokens
+    )
+    for anno in annotations:
+        ids.append(anno['id'])
+        if anno['label'] == 'MASK':
+            annotation_token_ix_set = (
+                set()
+            )  # A set that stores the token indices of the annotation
+            for char_ix in range(anno["start_offset"], anno["end_offset"]):
+
+                token_ix = tokenized.char_to_token(char_ix)
+                if token_ix is not None:
+                    annotation_token_ix_set.add(token_ix)
+            last_token_in_anno_ix = len(annotation_token_ix_set) - 1
+            for num, token_ix in enumerate(sorted(annotation_token_ix_set)):
+                if num == 0:
+                    prefix = "B"
+                else:
+                    prefix = "I"  # We're inside of a multi token annotation
+                aligned_labels[token_ix] = f"{prefix}-{anno['label']}"
+                identifier_types[token_ix] = anno['identifier_type']
+                offsets[token_ix] = {anno['id'] : (anno['start_offset'], anno['end_offset'])}
+
+    return aligned_labels, identifier_types, offsets, ids
+
+
 
