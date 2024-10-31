@@ -140,7 +140,7 @@ def get_dataset(self:Self, dataset_indices: np.ndarray) -> np.ndarray:
         dataset_indices = np.array(dataset_indices, ndmin=1)
 
     self._validate_indices(dataset_indices)
-
+    
     return self.population.subset(dataset_indices)
 
 def get_dataloader(self: Self, dataset_indices: np.ndarray, batch_size: int = 32) -> DataLoader:

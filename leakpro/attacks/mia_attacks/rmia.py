@@ -106,6 +106,8 @@ class AttackRMIA(AbstractMIA):
 
         # train shadow models
         logger.info(f"Check for {self.num_shadow_models} shadow models (dataset: {len(self.attack_data_indices)} points)")
+        print(self.attack_data_indices)
+    
         self.shadow_model_indices = ShadowModelHandler().create_shadow_models(
             num_models = self.num_shadow_models,
             shadow_population = self.attack_data_indices,

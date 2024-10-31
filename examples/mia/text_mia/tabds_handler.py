@@ -50,7 +50,7 @@ class TABInputHandler(AbstractInputHandler):
         model.train()
 
         criterion = self.get_criterion()
-        optimizer = self.get_optimizer()
+        optimizer = self.get_optimizer(model = model)
         
 
         train_acc, train_loss = 0.0, 0.0
@@ -58,8 +58,8 @@ class TABInputHandler(AbstractInputHandler):
         for e in tqdm(range(epochs), desc="Training Progress"):
             
             model.train()    
-            for X in tqdm(dataloader):
-                y = X['labels']
+            for X, labels in tqdm(dataloader):
+                y = labels
                 optimizer.zero_grad()
                 y_pred = model(X)
                 y_pred = y_pred.permute(0,2,1)

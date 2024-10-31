@@ -23,7 +23,7 @@ class TABBERT(nn.Module):
     def forward(self, batch):
         dev = device("cuda" if cuda.is_available() else "cpu")
         b = self._bert(
-            input_ids=batch["input_ids"], attention_mask=batch["attention_masks"]
+            input_ids=batch.input_ids, attention_mask=batch.attention_masks
         )
         pooler = b.last_hidden_state
         return self.classifier(pooler)
@@ -33,9 +33,9 @@ def evaluate(model, loader, criterion, dev):
     loss, acc = 0, 0
     
     with no_grad():
-        for X in tqdm(loader):
-            y = X['labels']
-            y_pred = model(X)
+        for X, labels in tqdm(loader):
+            y = labels.to(dev)
+            y_pred = model(X.to(dev))
             y_pred = y_pred.permute(0,2,1)
             val_loss = criterion(y_pred, y)
             loss += val_loss.item()
@@ -54,10 +54,8 @@ def create_trained_model_and_metadata(model, train_loader, test_loader, epochs =
 
     criterion = None
     if cuda.is_available():
-       
         criterion = CrossEntropyLoss(ignore_index=-1, weight=Tensor([1.0, 10.0, 10.0]).cuda())
     else:
-       
         criterion = CrossEntropyLoss(ignore_index=-1, weight=Tensor([1.0, 10.0, 10.0]))
 
     optimizer = optim.AdamW(model.parameters(),lr=2e-5, eps=1e-8)
@@ -75,10 +73,10 @@ def create_trained_model_and_metadata(model, train_loader, test_loader, epochs =
 
         train_acc, train_loss = 0.0, 0.0
 
-        for X in tqdm(train_loader):
+        for X, labels in tqdm(train_loader):
           
-            y = X['labels']
-            y_pred = model(X)
+            y = labels.to(dev)
+            y_pred = model(X.to(dev))
             optimizer.zero_grad()
             y_pred = y_pred.permute(0,2,1)
             loss = criterion(y_pred, y)

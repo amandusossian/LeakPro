@@ -113,9 +113,11 @@ class AttackLiRA(AbstractMIA):
         #       from (Membership Inference Attacks From First Principles)
         self.fix_var_threshold = 32
 
+        # Creates a list of indices which the attack is to be conducted on. 
+        # Basically (All indices) - train - test if self.online is false, otherwise all indices
         self.attack_data_indices = self.sample_indices_from_population(include_train_indices = self.online,
                                                                        include_test_indices = self.online)
-
+        
         self.shadow_model_indices = ShadowModelHandler().create_shadow_models(num_models = self.num_shadow_models,
                                                                               shadow_population =  self.attack_data_indices,
                                                                               training_fraction = self.training_data_fraction,
@@ -157,7 +159,7 @@ class AttackLiRA(AbstractMIA):
                 logger.info(f"Some shadow model(s) contains {count_in_samples} IN samples in total for the model(s)")
                 logger.info("This is not an offline attack!")
 
-        self.batch_size = len(audit_data_indices)
+        self.batch_size = 2
         logger.info(f"Calculating the logits for all {self.num_shadow_models} shadow models")
         self.shadow_models_logits = np.swapaxes(self.signal(self.shadow_models, self.handler, audit_data_indices,\
                                                             self.batch_size), 0, 1)
@@ -258,6 +260,7 @@ class AttackLiRA(AbstractMIA):
         true labels, and signal values.
 
         """
+        
         n_audit_samples = self.shadow_models_logits.shape[0]
         score = np.zeros(n_audit_samples)  # List to hold the computed probability scores for each sample
 

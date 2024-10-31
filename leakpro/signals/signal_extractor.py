@@ -263,14 +263,16 @@ class PytorchModel(Model):
                 The rescaled logit value.
 
             """
-
+            
             device = "cuda:0" if cuda.is_available() else "cpu"
             self.model_obj.to(device)
             self.model_obj.eval()
+            
             with no_grad():
 
                 x = batch_samples.to(device)
                 y = batch_labels.to(device)
+
                 all_logits = self.model_obj(x)
 
                 if all_logits.shape[1] == 1:

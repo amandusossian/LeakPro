@@ -15,6 +15,7 @@ from transformers import LongformerTokenizerFast, PreTrainedTokenizerFast
 from itertools import product
 from transformers import BatchEncoding
 from tokenizers import Encoding
+from torch.nn.utils.rnn import pad_sequence
 
 
 dev = 'cuda' if cuda.is_available() else 'cpu'
@@ -55,13 +56,12 @@ class TABDataset(Dataset):
             label_set: LabelSet,
             tokenizer: PreTrainedTokenizerFast,
             tokens_per_batch=32,
-            window_stride=None,
+            window_stride=None            
         ):
             self.label_set = label_set
             self.tokens_per_batch = tokens_per_batch
             self.window_stride = tokens_per_batch if window_stride is None else window_stride
             self.tokenizer = tokenizer
-        
             self.texts = []
             self.annotations = []
             ids = []
@@ -145,15 +145,15 @@ class TABDataset(Dataset):
         input_ids = tensor(ex.input_ids, dtype=long).to(dev)
         attention_masks = tensor(ex.attention_masks, dtype=long).to(dev)
         labels = tensor(ex.labels, dtype=long).to(dev)
-
-        # You can return other fields like identifier_types, offsets, etc.
+        identifier_types = ex.identifier_types
+        offsets= ex.offsets
+        # Return dict 
         return {
             'input_ids': input_ids,
             'attention_masks': attention_masks,
-            'labels': labels,
-            'identifier_types': ex.identifier_types,  # Leave as list if necessary
-            'offsets': ex.offsets  # Leave as list if necessary
-        }
+            'identifier_types': identifier_types, 
+            'offsets': offsets  
+        }, labels
 
 
     def subset(self, indices):
@@ -163,11 +163,9 @@ class TABDataset(Dataset):
         subset_data = TABDataset.__new__(TABDataset)  # Bypass __init__
 
         # Directly subset the relevant fields from the original dataset
-      
-        subset_data.texts = [self.texts[i] for i in indices]
-        subset_data.annotations = [self.annotations[i] for i in indices]
+        
+        
         subset_data.training_examples = [self.training_examples[i] for i in indices]
-
         # Copy the tokenizer, label_set, tokens_per_batch, and window_stride
         subset_data.tokenizer = self.tokenizer
         subset_data.tokens_per_batch = self.tokens_per_batch
@@ -175,8 +173,31 @@ class TABDataset(Dataset):
         subset_data.label_set = self.label_set
 
         return subset_data
-        
     
+    def collate_fn(self, batch):
+        input_ids = [item[0]['input_ids'] for item in batch]
+        attention_masks = [item[0]['attention_masks'] for item in batch]
+        labels = [item[1] for item in batch]
+        
+        
+        input_ids = pad_sequence(input_ids, batch_first=True, padding_value=self.tokenizer.pad_token_id)
+        attention_masks = pad_sequence(attention_masks, batch_first=True, padding_value=0)
+        labels = pad_sequence(labels, batch_first=True, padding_value=-1)
+        
+        
+        return Batch(input_ids = input_ids, attention_masks = attention_masks), labels
+    
+class Batch:
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    def to(self, device):
+        for key, value in vars(self).items():
+            setattr(self, key, value.to(device))
+        return self
+
+
 # TODO: Implement downloader after it is done with the first normal case
 '''
 def download_tab_dataset(data_dir):
@@ -207,28 +228,33 @@ def preprocess_tab_dataset(datapath, create_new = False):
     #bert = 'allenai/longformer-base-4096'
     #label_set = LabelSet(labels=["MASK"])
 
-    if os.path.exists(datapath + "/tab_train_old.pkl"):
-
-        if create_new: 
+    # try to create a new dataset from an existing file
+    if create_new: 
+        if os.path.exists(datapath + "/tab_train_old.pkl"):
             bert = 'allenai/longformer-base-4096'
             label_set = LabelSet(labels=["MASK"])
-            with open(datapath+ "/tab_train_old.pkl", "rb") as f:
+            with open(datapath+ "/tab_train_200.pkl", "rb") as f:
                 dataset  = TABDataset(joblib.load(f), label_set = label_set, 
                                      tokenizer = LongformerTokenizerFast.from_pretrained(bert),
                                      tokens_per_batch=4096) 
-            with open(datapath+ "/tab_train_dataset.pkl", 'wb') as handle:
+            with open(datapath+ "/tab_train_200_dataset.pkl", 'wb') as handle:
                 pickle.dump(dataset, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        else: 
-            with open(datapath+ "/tab_train_dataset.pkl", "rb") as f:
-                dataset = joblib.load(f)
-      
+    
 
-
+    # otherwise we see if we can load a dataset
     else: 
-        print(os.path.join(datapath, "tab_data/tab_train.pkl"))
-        assert 1 == 2, "Something went wrong with loading existing data."
-        # TODO: Implement downloader after it is done with the first normal case
+        if os.path.exists(datapath + "/tab_train_200_dataset.pkl"):
+            print(1243)
+            with open(datapath+ "/tab_train_200_dataset.pkl", "rb") as f:
+                dataset = joblib.load(f)
+
+
+        # otherwise we should download it
+        else: 
+            print(os.path.join(datapath, "tab_data/tab_train.pkl"))
+            assert 1 == 2, "Can't download datasets yet."
+ 
     
 
     return dataset
@@ -246,13 +272,12 @@ def get_tab_dataloaders(dataset, train_fraction=0.3, test_fraction=0.3):
     train_subset = Subset(dataset, train_indices)
     test_subset = Subset(dataset, test_indices)
     
-    train_loader = DataLoader(train_subset, batch_size=1, shuffle=True)
-    test_loader = DataLoader(test_subset, batch_size=1, shuffle=False)
+    train_loader = DataLoader(train_subset, batch_size=1, collate_fn=dataset.collate_fn, shuffle=True)
+    test_loader = DataLoader(test_subset, batch_size=1, collate_fn=dataset.collate_fn, shuffle=False)
 
     return train_loader, test_loader
 
-def collate_fn(batch):
-    return TrainingBatch(batch)
+
 
 class TrainingBatch:
     def __getitem__(self, item):
