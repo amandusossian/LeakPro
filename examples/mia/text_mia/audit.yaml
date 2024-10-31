@@ -38,7 +38,7 @@ target:
   model_class: "TABBERT" 
   # Data paths
   target_folder: "./target"
-  data_path: "utils/tab_data/tab_train_200_dataset.pkl"
+  data_path: "tab_data/tab_train_200_dataset.pkl"
 
 shadow_model:
   
