@@ -166,10 +166,8 @@ cython_debug/
 data/cifar*
 data/CINIC*
 attack_objects/
-examples/mia/text_mia/utils/tab_data/tab_train_raw*
-examples/mia/text_mia/utils/tab_data/tab_train_full*
-examples/mia/text_mia/utils/tab_data/tab_train_dataset_old.pkl
-examples/mia/text_mia/utils/tab_data/tab_train_full_dataset.pkl
+examples/mia/text_mia/tab_data/tab_train_raw*
+examples/mia/text_mia/tab_data/tab_train_full*
 
 
 # Ignore outputs
