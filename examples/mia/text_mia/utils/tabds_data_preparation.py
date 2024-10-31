@@ -225,11 +225,11 @@ def download_tab_dataset(data_dir):
 
 def preprocess_tab_dataset(datapath, create_new = False):
     """Get the dataset, download it if necessary, and store it."""
-    #bert = 'allenai/longformer-base-4096'
-    #label_set = LabelSet(labels=["MASK"])
+    # maybe can not have file paths in here, but as args instead
 
-    # try to create a new dataset from an existing file
+    # try to create a new dataset from an existing datafile
     if create_new: 
+        print("Creating a dataset from file.")
         if os.path.exists(datapath + "/tab_train_raw_200.pkl"):
             bert = 'allenai/longformer-base-4096'
             label_set = LabelSet(labels=["MASK"])
@@ -242,15 +242,15 @@ def preprocess_tab_dataset(datapath, create_new = False):
 
     
 
-    # otherwise we see if we can load a dataset
+    # otherwise we try to load a dataset
     else: 
         if os.path.exists(datapath + "/tab_train_200_dataset.pkl"):
-            print(1243)
+            print("Loading local dataset.")
             with open(datapath+ "/tab_train_200_dataset.pkl", "rb") as f:
                 dataset = joblib.load(f)
 
 
-        # otherwise we should download it
+        # otherwise we should download it, but that hasn't been implemented yet
         else: 
             print(os.path.join(datapath, "tab_data/tab_train.pkl"))
             assert 1 == 2, "Can't download datasets yet."
