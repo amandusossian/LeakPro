@@ -166,6 +166,8 @@ cython_debug/
 data/cifar*
 data/CINIC*
 attack_objects/
+examples/mia/text_mia/utils/tab_data/tab_train_raw*
 
 # Ignore outputs
 leakpro_output/*
+
