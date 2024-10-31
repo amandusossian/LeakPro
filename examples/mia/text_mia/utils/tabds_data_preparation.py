@@ -230,10 +230,10 @@ def preprocess_tab_dataset(datapath, create_new = False):
 
     # try to create a new dataset from an existing file
     if create_new: 
-        if os.path.exists(datapath + "/tab_train_old.pkl"):
+        if os.path.exists(datapath + "/tab_train_raw_200.pkl"):
             bert = 'allenai/longformer-base-4096'
             label_set = LabelSet(labels=["MASK"])
-            with open(datapath+ "/tab_train_200.pkl", "rb") as f:
+            with open(datapath+ "/tab_train_raw_200.pkl", "rb") as f:
                 dataset  = TABDataset(joblib.load(f), label_set = label_set, 
                                      tokenizer = LongformerTokenizerFast.from_pretrained(bert),
                                      tokens_per_batch=4096) 
