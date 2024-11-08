@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 
 import numpy as np
-from torch import IntTensor, Tensor, cat, cuda, exp, flatten, log, max, nn, no_grad, sigmoid, sum
+from torch import IntTensor, Tensor, cat, cuda, exp, flatten, log, max, nn, no_grad, sigmoid, sum, mean
 from torch.utils.data import DataLoader
 
 from leakpro.signals.utils.HopSkipJumpDistance import HopSkipJumpDistance
@@ -275,20 +275,41 @@ class PytorchModel(Model):
 
                 all_logits = self.model_obj(x)
 
+                all_logits.squeeze() # Makes the logits have shape (4096, 3)
+
                 if all_logits.shape[1] == 1:
                     positive_class_prob = sigmoid(all_logits)
                     predictions = cat([1 - positive_class_prob, positive_class_prob], dim=1)
                 else:
+                    # Subtract the max from each prediction vector - for numerical reasons (?)
                     predictions = all_logits - max(all_logits, dim=1, keepdim=True).values
+                    
+                    # Raise to e, and divide by sum (= softmax) 
                     predictions = exp(predictions)
                     predictions = predictions/sum(predictions,dim=1, keepdim=True)
-
+                    
+                # Nr of samples 
                 count = predictions.shape[0]
-                y_true = predictions[np.arange(count), y.type(IntTensor)]
-                predictions[np.arange(count), y.type(IntTensor)] = 0
 
+                # Fetches the probability laid on the true prediction
+                y_true = predictions[np.arange(count), y.type(IntTensor)]
+
+                # Sets the probability of the true class to 0
+                predictions[np.arange(count), y.type(IntTensor)] = 0
+                # Sums the remaining probability and assigns it to y_wrong
                 y_wrong = sum(predictions, dim=1)
-                output_signals = flatten(log(y_true+1e-45) - log(y_wrong+1e-45)).cpu().numpy()
+
+                # For each token, this is the difference between the log of the correct, and the log of the 
+                # incorrect predictions, which will be used to generate the gausdsians in lira. 
+                # NOTE There should be one output per sample! Currently on token level. 
+                # Changing to mean for now
+                output_signals = flatten(log(y_true+1e-45) - log(y_wrong+1e-45)).mean().cpu().numpy()
+
+                # Convert to a Python scalar if it's a 0-d NumPy array
+                if np.ndim(output_signals) == 0:   
+                    output_signals = output_signals.item() 
+                    
+                output_signals = [output_signals] if isinstance(output_signals, (float, int)) else output_signals
 
             self.model_obj.to("cpu")
             return output_signals

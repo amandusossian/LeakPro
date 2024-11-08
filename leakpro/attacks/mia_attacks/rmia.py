@@ -184,7 +184,7 @@ class AttackRMIA(AbstractMIA):
         logits_theta = np.array(self.signal([self.target_model], self.handler, audit_data_indices))
         # collect the softmax output of the correct class
         n_audit_points = len(audit_data_indices)
-        p_x_given_target_model = softmax_logits(logits_theta, self.temperature)[:,np.arange(n_audit_points),ground_truth_indices]
+        p_x_given_target_model = softmax_logits(logits_theta, self.temperature)[np.arange(n_audit_points),ground_truth_indices]
 
         # run points through shadow models, colelct logits and compute p(x)
         logits_shadow_models = self.signal(self.shadow_models, self.handler, audit_data_indices)

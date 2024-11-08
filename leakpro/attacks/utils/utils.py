@@ -15,6 +15,9 @@ def softmax_logits(logits: np.ndarray, temp:float=1.0, dimension:int=-1) -> np.n
 
     """
     # If the number of classes is 1, apply sigmoid to return a matrix of [1 - p, p]
+    if logits.shape[0] == 1:
+        logits = logits.squeeze()
+    
     if logits.shape[dimension] == 1:
         logits = from_numpy(logits)
         positive_confidence = sigmoid(logits / temp)  # Apply sigmoid to get the probability of class 1
@@ -26,5 +29,5 @@ def softmax_logits(logits: np.ndarray, temp:float=1.0, dimension:int=-1) -> np.n
     logits = logits - max(logits, dim=dimension, keepdim=True).values
     logits = exp(logits)
     logits = logits/sum(logits, dim=dimension, keepdim=True)
-    return logits.numpy()
+    return logits.mean(dim = dimension).numpy()
 

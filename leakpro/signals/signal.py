@@ -55,7 +55,7 @@ class ModelLogits(Signal):
         models: List[Model],
         handler: AbstractInputHandler,
         indices: np.ndarray,
-        batch_size: int = 32,
+        batch_size: int = 1,
     ) -> List[np.ndarray]:
         """Built-in call method.
 

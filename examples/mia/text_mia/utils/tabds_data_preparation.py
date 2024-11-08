@@ -105,11 +105,17 @@ class TABDataset(Dataset):
                 length = len(label)  # How long is this sequence
                 for start in range(0, length, self.window_stride):
                     end = min(start + tokens_per_batch, length)
+                    current_encodings = encoding.ids[start:end]
+                    
+                    # If only self.tokenizer.pad_token_id are in the window, dont add training example 
+                    if all(x == self.tokenizer.pad_token_id for x in current_encodings):
+                        continue
                     padding_to_add = 0
+              
                     self.training_examples.append(
                         TrainingExample(
                             # Record the tokens
-                            input_ids=encoding.ids[start:end]  # The ids of the tokens
+                            input_ids=current_encodings  # The ids of the tokens
                             + [self.tokenizer.pad_token_id]
                             * padding_to_add,  # padding if needed
                             labels=(
@@ -244,11 +250,11 @@ def preprocess_tab_dataset(datapath, create_new = False):
 
     # otherwise we try to load a dataset
     else: 
-        if os.path.exists(datapath + "/tab_train_200_dataset.pkl"):
+        if os.path.exists(datapath + "tab_train_200_dataset.pkl"):
             print("Loading local dataset.")
-            with open(datapath+ "/tab_train_200_dataset.pkl", "rb") as f:
+            with open(datapath+ "tab_train_200_dataset.pkl", "rb") as f:
                 dataset = joblib.load(f)
-
+            print("Local dataset succsesfully loaded.")
 
         # otherwise we should download it, but that hasn't been implemented yet
         else: 

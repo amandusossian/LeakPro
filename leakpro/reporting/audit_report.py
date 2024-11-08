@@ -319,8 +319,8 @@ class SignalHistogramReport(AuditReport):
 
         data = pd.DataFrame(
                 {
-                    "Signal": values,
-                    "Membership": ["Member" if y == 1 else "Non-member" for y in labels],
+                    "Signal": np.array(values),
+                    "Membership": np.array(["Member" if y == 1 else "Non-member" for y in labels]),
                 }
             )
 
@@ -331,7 +331,7 @@ class SignalHistogramReport(AuditReport):
             x="Signal",
             hue="Membership",
             element="step",
-            kde=True,
+            kde=False,
             bins = bin_edges
         )
 

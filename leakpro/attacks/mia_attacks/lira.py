@@ -113,8 +113,8 @@ class AttackLiRA(AbstractMIA):
         #       from (Membership Inference Attacks From First Principles)
         self.fix_var_threshold = 32
 
-        # Creates a list of indices which the attack is to be conducted on. 
-        # Basically (All indices) - train - test if self.online is false, otherwise all indices
+        # Creates a list of indices which the attack is to be conducted on, i.e which indices the ref models can train on. 
+        # Basically (All indices) - train indices - test indices  if self.online is false, otherwise all indices
         self.attack_data_indices = self.sample_indices_from_population(include_train_indices = self.online,
                                                                        include_test_indices = self.online)
         
@@ -159,7 +159,7 @@ class AttackLiRA(AbstractMIA):
                 logger.info(f"Some shadow model(s) contains {count_in_samples} IN samples in total for the model(s)")
                 logger.info("This is not an offline attack!")
 
-        self.batch_size = 2
+        self.batch_size = 1
         logger.info(f"Calculating the logits for all {self.num_shadow_models} shadow models")
         self.shadow_models_logits = np.swapaxes(self.signal(self.shadow_models, self.handler, audit_data_indices,\
                                                             self.batch_size), 0, 1)
@@ -289,7 +289,7 @@ class AttackLiRA(AbstractMIA):
                 pr_in = -norm.logpdf(target_logit, in_mean, in_std + 1e-30)
             else:
                 pr_in = 0
-
+            
             score[i] = (pr_in - pr_out)  # Append the calculated probability density value to the score list
 
         # Generate thresholds based on the range of computed scores for decision boundaries

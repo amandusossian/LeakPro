@@ -21,7 +21,7 @@ class TABBERT(nn.Module):
         self.classifier = nn.Linear(768, num_classes)
     
     def forward(self, batch):
-        dev = device("cuda" if cuda.is_available() else "cpu")
+        
         b = self._bert(
             input_ids=batch.input_ids, attention_mask=batch.attention_masks
         )
