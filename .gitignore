@@ -167,8 +167,13 @@ data/cifar*
 data/CINIC*
 attack_objects/
 examples/mia/text_mia/tab_data/*
-examples/mia/text_mia/tab_data/examples/mia/text_mia
 examples/mia/text_mia/saved_results_msc/*
+# Ignore specific large files
+examples/mia/text_mia/tab_data/tab_train_full_dataset.pkl
+examples/mia/text_mia/tab_data/another_large_file.pkl
+
+# Ignore all .pkl files in this specific folder
+examples/mia/text_mia/tab_data/*.pkl
 
 # Ignore outputs
 leakpro_output/*
