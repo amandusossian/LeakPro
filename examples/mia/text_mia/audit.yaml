@@ -4,7 +4,7 @@ audit:  # Configurations for auditing
     rmia:
      training_data_fraction: 0.2  # Fraction of the auxilary dataset to use for this attack (in each shadow model training)
      attack_data_fraction: 0.2 # Fraction of auxiliary dataset to sample from during attack
-     num_shadow_models: 3 # Number of shadow models to train
+     num_shadow_models: 10 # Number of shadow models to train
      online: True # perform online or offline attack
      temperature: 2
      gamma: 2.0
@@ -38,7 +38,7 @@ target:
   model_class: "TABBERT" 
   # Data paths
   target_folder: "./target"
-  data_path: "tab_data/tab_train_200_dataset.pkl"
+  data_path: "tab_data/tab_train_full_dataset.pkl"
 
 shadow_model:
   

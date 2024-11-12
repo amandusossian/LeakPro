@@ -98,6 +98,8 @@ class TABDataset(Dataset):
                 o.append(outs)
             ###END OF LABEL ALIGNMENT
 
+            # TODO: Add modality for pos-tag masks. 
+
             ###MAKE A LIST OF TRAINING EXAMPLES.
             self.training_examples: List[TrainingExample] = []
             empty_label_id = "O"
@@ -110,22 +112,22 @@ class TABDataset(Dataset):
                     # If only self.tokenizer.pad_token_id are in the window, dont add training example 
                     if all(x == self.tokenizer.pad_token_id for x in current_encodings):
                         continue
-                    padding_to_add = 0
+                    
+                    # TODO: Fixed more padding. Check if good. 
+                    padding_to_add = self.window_stride - (end-start)  
               
                     self.training_examples.append(
                         TrainingExample(
                             # Record the tokens
                             input_ids=current_encodings  # The ids of the tokens
-                            + [self.tokenizer.pad_token_id]
-                            * padding_to_add,  # padding if needed
+                            + [self.tokenizer.pad_token_id] * padding_to_add,  # padding if needed
                             labels=(
                                 label[start:end]
                                 + [-1] * padding_to_add  # padding if needed
                             ),
                             attention_masks=(
                                 encoding.attention_mask[start:end]
-                                + [0]
-                                * padding_to_add  # 0'd attention masks where we added padding
+                                + [0] * padding_to_add  # 0'd attention masks where we added padding
                             ),
                             identifier_types=(identifier_type[start:end]
                                 + [-1] * padding_to_add ##Not used 
@@ -233,32 +235,32 @@ def preprocess_tab_dataset(datapath, create_new = False):
     """Get the dataset, download it if necessary, and store it."""
     # maybe can not have file paths in here, but as args instead
 
-    # try to create a new dataset from an existing datafile
+    # Create a new dataset from an existing datafile
     if create_new: 
         print("Creating a dataset from file.")
-        if os.path.exists(datapath + "/tab_train_raw_200.pkl"):
+        if os.path.exists(datapath + "/tab_train_raw.pkl"):
             bert = 'allenai/longformer-base-4096'
             label_set = LabelSet(labels=["MASK"])
-            with open(datapath+ "/tab_train_raw_200.pkl", "rb") as f:
+            with open(datapath+ "/tab_train_raw.pkl", "rb") as f:
                 dataset  = TABDataset(joblib.load(f), label_set = label_set, 
                                      tokenizer = LongformerTokenizerFast.from_pretrained(bert),
                                      tokens_per_batch=4096) 
-            with open(datapath+ "/tab_train_200_dataset.pkl", 'wb') as handle:
+            with open(datapath+ "/tab_train_full_dataset.pkl", 'wb') as handle:
                 pickle.dump(dataset, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     
 
     # otherwise we try to load a dataset
     else: 
-        if os.path.exists(datapath + "tab_train_200_dataset.pkl"):
+        if os.path.exists(datapath + "tab_train_full_dataset.pkl"):
             print("Loading local dataset.")
-            with open(datapath+ "tab_train_200_dataset.pkl", "rb") as f:
+            with open(datapath+ "tab_train_full_dataset.pkl", "rb") as f:
                 dataset = joblib.load(f)
             print("Local dataset succsesfully loaded.")
 
         # otherwise we should download it, but that hasn't been implemented yet
         else: 
-            print(os.path.join(datapath, "tab_data/tab_train.pkl"))
+            
             assert 1 == 2, "Can't download datasets yet."
  
     

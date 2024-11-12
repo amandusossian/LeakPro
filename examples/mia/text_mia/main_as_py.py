@@ -15,14 +15,10 @@ test_fraction=0.3)
 if not os.path.exists("target"):
     os.makedirs("target")
 
-
-
 n_classes = 3 # Case dependent, is equal to 2*number of masktypes + 1
-
 pretrained_model_name = "allenai/longformer-base-4096"
 model = TABBERT(pt_model= pretrained_model_name, num_classes=n_classes)
-n_epochs = 2
-
+n_epochs = 3
 
 train_acc, train_loss, test_acc, test_loss = create_trained_model_and_metadata(model = model, 
                                                                                train_loader = train_loader, 
@@ -31,7 +27,6 @@ train_acc, train_loss, test_acc, test_loss = create_trained_model_and_metadata(m
 
 
 from tabds_handler import TABInputHandler
-
 from leakpro import LeakPro
 
 # Read the config file
