@@ -1,0 +1,2 @@
+Qutie large runs, online lira and rmia with 16 SMs.
+Using binary masking, i.e. only masked/no mask.
