@@ -29,5 +29,5 @@ def softmax_logits(logits: np.ndarray, temp:float=1.0, dimension:int=-1) -> np.n
     logits = logits - max(logits, dim=dimension, keepdim=True).values
     logits = exp(logits)
     logits = logits/sum(logits, dim=dimension, keepdim=True)
-    return logits.mean(dim = dimension).numpy()
+    return logits.numpy()
 

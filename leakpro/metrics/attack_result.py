@@ -88,6 +88,9 @@ class CombinedMetricResult:
         predictions_proba:list=None,
         signal_values:list=None,
         threshold: list = None,
+        tp_entity_dist = None,
+        fp_entity_dist = None,
+
     )-> None:
         """Compute and store the accuracy, ROC AUC score, and the confusion matrix for a metric.
 
@@ -98,6 +101,8 @@ class CombinedMetricResult:
             predictions_proba: Continuous version of the predicted_labels.
             signal_values: Values of the signal used by the metric.
             threshold: Threshold computed by the metric.
+            tp_entity_ratio: Ratio of entities occuring in the true positives.
+            fp_entity_ratio: Ratio of entites occuring in the false positives.
 
         """
         self.predicted_labels = predicted_labels
@@ -105,6 +110,9 @@ class CombinedMetricResult:
         self.predictions_proba = predictions_proba
         self.signal_values = signal_values
         self.threshold = threshold
+        if tp_entity_dist is not None:
+            self.tp_entity_dist = tp_entity_dist
+            self.fp_entity_dist = fp_entity_dist
 
         self.accuracy = np.mean(predicted_labels == true_labels, axis=1)
         self.tn = np.sum(true_labels == 0) - np.sum(
@@ -121,6 +129,12 @@ class CombinedMetricResult:
         sorted_indices = np.argsort(self.fpr)
         self.fpr = self.fpr[sorted_indices]
         self.tpr = self.tpr[sorted_indices]
+        if tp_entity_dist is not None:
+            self.tp_entity_dist = tp_entity_dist
+            self.fp_entity_dist = fp_entity_dist
+            self.tp_entity_dist = self.tp_entity_dist[sorted_indices]
+            self.fp_entity_dist = self.fp_entity_dist[sorted_indices]
+
 
         self.roc_auc = auc(self.fpr, self.tpr)
 

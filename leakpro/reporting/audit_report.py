@@ -189,25 +189,97 @@ class ROCCurveReport(AuditReport):
         # If the directory doesn't exist, create it
         if not os.path.exists(directory):
             os.makedirs(directory)
-
-
+        
+        
         with open(filename.replace(".png", ".csv"), "w") as f:
             f.write("fpr,tpr\n")
             for i in range(len(fpr)):
                 f.write(f"{fpr[i]},{tpr[i]}\n")
-
-
+        
+        
+        
+        n_classes = len(configs["class_list"])
+        if (configs["binary_masking"] is False ) and hasattr(metric_result[0], "tp_entity_dist") and hasattr(metric_result[0], "fp_entity_dist"):
+            with open(filename.replace("ROC.png", "ROC_and_Entity_ratios.csv"), "w") as f:
+                header_string = "fpr,tpr,"+ ",".join([f"{class_name}_tp_ratio" for class_name in configs["class_list"]])  + ',' + ",".join([f"{class_name}_fp_ratio" for class_name in configs["class_list"]]) + "\n"
+                f.write(header_string)
+                for i in range(len(fpr)):
+                    f.write(f"{fpr[i]},{tpr[i]}," + ",".join([f"{mr.tp_entity_dist[i,j]}" for j in range(n_classes)]) + ',' + ",".join([f"{mr.fp_entity_dist[i, j]}" for j in range(n_classes)]) + "\n")
+        else:
+            with open(filename.replace("ROC.png", "ROC_only_tpr_fpr.csv"), "w") as f:
+                header_string = "fpr,tpr"
+                f.write(header_string)
+                for i in range(len(fpr)):
+                    f.write(f"{fpr[i]},{tpr[i]}")
+          
         fixed_fpr_results(fpr, tpr, configs, filename)
 
         # Gets metric ID
         # TODO: add metric ID to the CombinedMetricResult class
         metric_id = "population_metric"
 
-        # Generate plot
+        # Generate plots
+        class_name_list = configs["class_list"]
         range01 = np.linspace(0, 1)
+        ones01 = np.ones_like(range01)
+
+
+        # For the true positives and false positives, show the entity ratios
+        if configs["binary_masking"] is False and hasattr(metric_result[0], "tp_entity_dist") and hasattr(metric_result[0], "fp_entity_dist"):
+            plt.figure(figsize=(12, 6))
+            plt.subplot(1, 2, 1)
+            for i in range(n_classes):
+                plt.plot(fpr, mr.tp_entity_dist[:,i], label=f"Class {class_name_list[i]}")
+            
+            #plt.xscale("log")
+            
+            plt.xlabel("FPR")
+            plt.ylabel("Entity ratio")
+            plt.title("Entity ratio in True Positives")
+            plt.axis([0, 1, 0, 1])
+
+            plt.subplot(1, 2, 2)
+            for i in range(n_classes):
+                plt.plot(fpr, mr.fp_entity_dist[:,i], label=f"Class {class_name_list[i]}")
+            
+            #plt.xscale("log")
+
+            plt.xlabel("FPR")
+            plt.ylabel("Entity ratio")
+            plt.title("Entity ratio in False Positives")
+            plt.axis([0, 1, 0, 1])
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(filename.replace("ROC.png", "Entity_ratios.png"), dpi=1000)
+            
+            plt.clf()
+
+            plt.figure(figsize=(6, 6))
+            # Now plot the delta between theses ratios
+            for i in range(n_classes):
+                plt.plot(fpr, mr.tp_entity_dist[:,i] - mr.fp_entity_dist[:,i], label=f"Class {class_name_list[i]}")
+            
+            plt.xlabel("FPR")
+            plt.ylabel("Entity ratio difference")
+            plt.title("Entity ratio difference")
+            plt.axis([0, 1, -1, 1])
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(filename.replace("ROC.png", "Entity_ratio_difference.png"), dpi=1000)
+            plt.clf()
+            
+
+        
+        
         plt.fill_between(fpr, tpr, alpha=0.15)
         plt.plot(fpr, tpr, label=EXPLANATIONS["metric"][metric_id]["name"])
         plt.plot(range01, range01, "--", label="Random guess")
+
+
+
+        
+
+
         plt.yscale("log")
         plt.xscale("log")
         plt.tight_layout()
@@ -219,11 +291,12 @@ class ROCCurveReport(AuditReport):
         plt.text(
             0.7,
             0.3,
-            f"AUC = {roc_auc:.03f}",
+            f"AUC = {abs(roc_auc):.03f}",
             horizontalalignment="center",
             verticalalignment="center",
             bbox={"facecolor": "white", "alpha": 0.5},
         )
+        plt.tight_layout()
         if save:
             plt.savefig(fname=filename, dpi=1000)
         if show:

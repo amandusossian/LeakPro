@@ -11,7 +11,8 @@ from leakpro.attacks.utils.distillation_model_handler import DistillationModelHa
 from leakpro.attacks.utils.shadow_model_handler import ShadowModelHandler
 from leakpro.input_handler.abstract_input_handler import AbstractInputHandler
 from leakpro.utils.logger import logger
-
+from examples.extraction_attacks.utils.pool_utils import PIIPool
+from examples.extraction_attacks.utils.mastermind import AttackMM 
 
 class AttackFactoryMIA:
     """Class responsible for creating the attack objects."""
@@ -22,7 +23,8 @@ class AttackFactoryMIA:
         "qmia": AttackQMIA,
         "loss_traj":AttackLossTrajectory,
         "lira": AttackLiRA,
-        "HSJ" : AttackHopSkipJump
+        "HSJ" : AttackHopSkipJump,
+        "mastermind": AttackMM
     }
 
     # Shared variables for all attacks

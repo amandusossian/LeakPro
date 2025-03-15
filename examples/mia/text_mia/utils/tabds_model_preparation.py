@@ -6,19 +6,20 @@ from transformers import BatchEncoding
 from tokenizers import Encoding
 from tqdm import tqdm  
 import transformers
+from sklearn.metrics import recall_score, precision_score
 
 class TABBERT(nn.Module):
-    def __init__(self, pt_model, num_classes):
+    def __init__(self, pt_model, n_classes):
         
         super().__init__()
         self._bert = transformers.LongformerModel.from_pretrained(pt_model)
         self.pt_model = pt_model
-        self.num_classes = num_classes
+        self.n_classes = n_classes
 
         for param in self._bert.parameters():
            param.requires_grad = True
         
-        self.classifier = nn.Linear(768, num_classes)
+        self.classifier = nn.Linear(768, n_classes)
     
     def forward(self, batch):
         
@@ -30,20 +31,27 @@ class TABBERT(nn.Module):
 
 def evaluate(model, loader, criterion, dev):
     model.eval()
-    loss, acc = 0, 0
+    loss, acc, pre, rec = 0, 0, 0, 0
     
     with no_grad():
         for X, labels in tqdm(loader):
             y = labels.to(dev)
             y_pred = model(X.to(dev))
             y_pred = y_pred.permute(0,2,1)
+            pred_idx = y_pred.argmax(dim=1)
             val_loss = criterion(y_pred, y)
             loss += val_loss.item()
-            acc += y_pred.eq(y).sum().item()
+            acc += pred_idx.eq(y).sum().item()
+            #pre += precision_score(y.cpu(), pred_idx.cpu(), average='macro')
+            #rec += recall_score(y.cpu(), pred_idx.cpu(), average='macro') 
+
+            
         loss /= len(loader)
         acc = float(acc) / len(loader.dataset)
+        #pre = float(pre) / len(loader)
+        #rec = float(rec) / len(loader)
     
-    return loss, acc
+    return loss, acc, pre, rec
 
 def create_trained_model_and_metadata(model, train_loader, test_loader, epochs = 10, metadata = None):
 
@@ -51,12 +59,13 @@ def create_trained_model_and_metadata(model, train_loader, test_loader, epochs =
    
     model.to(dev)
     model.train()
-
-    criterion = None
+    
+    weight_list = [10.0 for i in range(model.n_classes)]
+    weight_list[0] = 1.0
     if cuda.is_available():
-        criterion = CrossEntropyLoss(ignore_index=-1, weight=Tensor([1.0, 10.0, 10.0]).cuda())
+        criterion = CrossEntropyLoss(ignore_index=-1, weight=Tensor(weight_list).cuda())
     else:
-        criterion = CrossEntropyLoss(ignore_index=-1, weight=Tensor([1.0, 10.0, 10.0]))
+        criterion = CrossEntropyLoss(ignore_index=-1, weight=Tensor(weight_list))
 
     optimizer = optim.AdamW(model.parameters(),lr=2e-5, eps=1e-8)
     
@@ -64,8 +73,8 @@ def create_trained_model_and_metadata(model, train_loader, test_loader, epochs =
     
 
     # Training loop
-    train_losses, train_accuracies = [], []
-    test_losses, test_accuracies = [], []
+    train_losses, train_accuracies, train_recalls, train_precisions = [], [], [], []
+    test_losses, test_accuracies, test_recalls, test_precisions = [], [], [], []
     print("Training")
     for e in range(epochs):
         print("Epoch", int(e+1), "started")
@@ -79,23 +88,34 @@ def create_trained_model_and_metadata(model, train_loader, test_loader, epochs =
             y_pred = model(X.to(dev))
             optimizer.zero_grad()
             y_pred = y_pred.permute(0,2,1)
+            pred_idx = y_pred.argmax(dim=1)
             loss = criterion(y_pred, y)
             loss.backward()
             optimizer.step()
-            train_acc += y_pred.eq(y).sum().item()
+            #TODO Add more measurements, accuracy is not good on its own in this context
+            train_acc += pred_idx.eq(y).sum().item() 
+            
+            #train_recall += recall_score(y.cpu(), pred_idx.cpu(), average='macro')
+            #train_precision += precision_score(y.cpu(), pred_idx.cpu(), average='macro')
             train_loss += loss.item()
 
         train_loss = train_loss/len(train_loader)
         train_acc = train_acc/len(train_loader.dataset)
+        #train_recall = train_recall/len(train_loader)
+        #train_precision = train_precision/len(train_loader)
         
         train_losses.append(train_loss)
         train_accuracies.append(train_acc)
+        #train_recalls.append(train_recall)
+        #train_precisions.append(train_precision)
         
         print("Evaluating")
-        test_loss, test_acc = evaluate(model, test_loader, criterion, dev)
+        test_loss, test_acc, test_recall, test_precision = evaluate(model, test_loader, criterion, dev)
         
         test_losses.append(test_loss)
         test_accuracies.append(test_acc)
+        #test_recalls.append(test_recall)
+        #test_precisions.append(test_precision)
 
 
 
@@ -112,7 +132,7 @@ def create_trained_model_and_metadata(model, train_loader, test_loader, epochs =
     
     # Pre-trained model name and number of classes
     meta_data["init_params"] = {"pt_model": model.pt_model,
-                                "num_classes": model.num_classes}
+                                "n_classes": model.n_classes}
     
     # read out optimizer parameters
     meta_data["optimizer"] = {}
@@ -129,10 +149,10 @@ def create_trained_model_and_metadata(model, train_loader, test_loader, epochs =
 
     meta_data["batch_size"] = train_loader.batch_size
     meta_data["epochs"] = epochs
-    meta_data["train_acc"] = train_acc
-    meta_data["test_acc"] = test_acc
-    meta_data["train_loss"] = train_loss
-    meta_data["test_loss"] = test_loss
+    meta_data["train_acc"] = train_accuracies
+    meta_data["test_acc"] = test_accuracies
+    meta_data["train_loss"] = train_losses
+    meta_data["test_loss"] = test_losses
     meta_data["dataset"] = "tab"
     
     with open("target/model_metadata.pkl", "wb") as f:

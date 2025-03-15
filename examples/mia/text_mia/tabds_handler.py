@@ -6,6 +6,8 @@ from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+# import batch class 
+from examples.mia.text_mia.utils.tabds_data_preparation import Batch
 
 from leakpro import AbstractInputHandler
 
@@ -18,18 +20,16 @@ class TABInputHandler(AbstractInputHandler):
 
     def get_criterion(self)->None:
         """Set the CrossEntropyLoss for the model."""
-        # TODO: Implement the correct loss function for the model
-        # Assuming that the output is the probabilities of the different classes, 
-        # cross entropy loss feels like a good starting point to investigate.
-
+        weights = [10.0 for i in range(self.population.n_classes)]  
+        weights[0] = 1.0
         if cuda.is_available():
-            return CrossEntropyLoss(ignore_index=-1, weight=torch.Tensor([1.0, 10.0, 10.0]).cuda())
+            return CrossEntropyLoss(ignore_index=-1, weight=torch.Tensor(weights).cuda())
         else:
-            return CrossEntropyLoss(ignore_index=-1, weight=torch.Tensor([1.0, 10.0, 10.0]))
+            return CrossEntropyLoss(ignore_index=-1, weight=torch.Tensor(weights))
         
     def get_optimizer(self, model:torch.nn.Module) -> None:
         """Set the optimizer for the model."""
-        # TODO: Evaluate which model optimizer to use, but adam is prolly good
+        
         learning_rate = 2e-5
         epsilon = 1e-8
         return AdamW(model.parameters(), lr=learning_rate, eps=epsilon)
@@ -59,14 +59,18 @@ class TABInputHandler(AbstractInputHandler):
             
             model.train()    
             for X, labels in tqdm(dataloader):
-                y = labels
+                y = labels.to(dev)
                 optimizer.zero_grad()
-                y_pred = model(X)
+                
+                #X_feat = Batch(input_ids=X['input_ids'], attention_masks=X['attention_masks']).to(dev)
+                y_pred = model(X.to(dev))
                 y_pred = y_pred.permute(0,2,1)
+                pred_idx = y_pred.argmax(dim=1)
+
                 loss = criterion(y_pred, y)
                 loss.backward()
                 optimizer.step()
-                train_acc += y_pred.eq(y).sum().item()
+                train_acc += pred_idx.eq(y).sum().item()
                 train_loss += loss.item()
 
             print('Epoch', int(e + 1), "done.")
