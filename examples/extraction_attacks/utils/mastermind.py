@@ -44,8 +44,8 @@ class AttackMM(AbstractMIA):
             if self.data_pool_path is None:
                 raise ValueError("No datapool path provided")
             self.pool = PIIPool(self.data_pool_path)
-        if self.attack_pool_type == "extended":
-            self.pool.extend_pool(self.attack_pool_size_extension)
+        #if self.attack_pool_type == "extended":
+        #    self.pool.extend_pool(self.attack_pool_size_extension)
 
         # Set the target document to attack TODO: Change this to be more flexible
         self.target_doc_id = configs.get("target_doc_id", 0)
@@ -70,7 +70,12 @@ class AttackMM(AbstractMIA):
 
 
     def prepare_attack(self) -> None:
+        # LEAKPRO: What should be put in here? 
+        # Maybe unneccesary to think abt, but would be nice to be consistet with the rest
+        # of the attacks.
         pass
+
+
 
     def run_attack(self):
         observed_rewards = []
@@ -78,6 +83,7 @@ class AttackMM(AbstractMIA):
         # Random attack
         if self.attack_strategy == "random":
             logger.info("Using random sampling strategy")
+            # FIXME This is a temporary solution, should be changed to a more general one
             target_model = self.target_model.to(self.device)
             target_model.eval()
         
@@ -85,13 +91,11 @@ class AttackMM(AbstractMIA):
             
                 attack_doc, token_ids = self.fill_blanks(self.trimmed_target_example, self.n_tokens_to_fill)
                 self.tokens_target_doc[i] = token_ids
-                
-               
 
                 with no_grad():
-                    
+                    # BATCH 
+                    # DEV
                     target_feats, target_labels  = self.custom_collate_fn(attack_doc)
-
                     logits_target = target_model(target_feats)
                     probs_target = softmax_logits(logits_target.cpu().numpy())
                     probs_of_masks = self.calculate_confidence_for_masked_tokens(probs = probs_target, i_guess=i)
@@ -105,9 +109,12 @@ class AttackMM(AbstractMIA):
 
         # Bandit Attack TODO: Might need changing if more bandit algorithms are added
         elif self.attack_strategy == "bandit": 
+            
             logger.info("Using Tsallis inf sampling strategy")
             T = self.n_evaluations
+            
             mask_types = self.target_labels[self.target_token_idx]
+            
             extraction_game = ExtractionGame(T = T, 
                                              n_masks = self.n_tokens_to_fill, 
                                              mask_types = mask_types, 
@@ -117,7 +124,7 @@ class AttackMM(AbstractMIA):
             observed_rewards = []
             extraction_game.reset_game()
             
-            correct_guesses_over_time = np.zeros(extraction_game.num_players)
+            
             for t in tqdm(range(T)):
                 observed_rewards.append(extraction_game.step())
                 extraction_game.update_policies(observed_rewards[t], t)
@@ -140,21 +147,18 @@ class AttackMM(AbstractMIA):
                     correct_tokens = self.target_features['input_ids'][self.target_token_idx[i]:self.target_token_idx[i] + self.len_of_target_masks[i]]                    
                     best_found_tokens = self.tokenizer.encode(self.pool.candidate_pool[label_of_mask][top_five_ids[0]])[1:-1] 
                     
-                    print(f"True Entity: {label_of_mask}, True text: {self.tokenizer.decode(correct_tokens)}")
-                    print(f"Five best guesses and weights in policy for player {i}:")
-                    print(f"{[f'{self.pool.candidate_pool[label_of_mask][j]}, {actions[j]}' for j in top_five_ids]}")
+                    
+                    print_to_terminal = False
+                    if print_to_terminal: 
+                        print(f"True Entity: {label_of_mask}, True text: {self.tokenizer.decode(correct_tokens)}")
+                        print(f"Five best guesses and weights in policy for player {i}:")
+                        print(f"{[f'{self.pool.candidate_pool[label_of_mask][j]}, {actions[j]}' for j in top_five_ids]}")
                     
                     if len(correct_tokens) == len(best_found_tokens):
                         if correct_tokens == best_found_tokens:
                             correct_guesses += 1
-                    #f.write(f"Player {i}: {actions}")
 
-                #print(f"Learned policy of player {i} is: {[f'{action:.6f}' for action in actions]}")
             print(f'Number of completely correct identified tokens after {self.n_evaluations} evaluations are {correct_guesses},\nwhich is an accuracy of {100*correct_guesses/self.n_evaluations:.4f}%.')
-      
-        size_dict = self.pool.get_pool_sizes()
-        for k, v in size_dict.items():
-            print(f"Key {k}, length {v}")
         
         
         #self.print_results(self.fetch_best_candidates("member"))

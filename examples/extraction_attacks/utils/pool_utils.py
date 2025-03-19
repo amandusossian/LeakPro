@@ -1,13 +1,16 @@
 import random
 import json
 import pickle
-
+import os 
 
 class PIIPool: 
 
     def __init__(self, datapath, n_to_add = 0):
 
         self.candidate_pool = {}        # The full candidate pool from the dataset
+        print(datapath)
+        print(os.path.exists(datapath))
+        print(os.getcwd())
         self.create_pii_pool(datapath)
         
         self.attack_pool = {}           # The attack pool, if different from the full dataset
@@ -42,6 +45,18 @@ class PIIPool:
                             dct[annotation['entity_type']].append(annotation["span_text"])
                             
         self.candidate_pool = dct
+
+    def load_attack_pool(self, attack_pool_path):
+        """
+        Load an attack pool from a file.
+        TODO: Consider if this should be added, as there might be not that useful. Maybe load population pool and slice it here instead though.
+        attack_pool_path: str
+            Path to the file containing the attack pool.
+        """
+        with open(attack_pool_path, "rb") as f:
+            self.attack_pool = pickle.load(f)
+            self.attack_pool_lengths = {k: len(v) for k, v in self.attack_pool.items()}
+
     
     def create_attack_pool(self, target_entities):
         """
@@ -90,11 +105,6 @@ class PIIPool:
                 entity_id = random.randint(0, len(self.candidate_pool[entity_type]) - 1)
             return self.candidate_pool[entity_type][entity_id]
 
-
-
-    
-    
-
     def get_pool(self):
         """
         Return the pool. If an attack pool is present, return the attack pool,
@@ -113,6 +123,6 @@ class PIIPool:
         """
 
         if self.attack_pool:
-            return self.attack_pool_lengths
+            return {k: len(v) for k, v in self.attack_pool.items()}
         else:
-            return self.candidate_pool_lengths
+            return {k: len(v) for k, v in self.candidate_pool.items()}

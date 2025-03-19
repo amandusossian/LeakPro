@@ -103,23 +103,22 @@ class ExtractionGame(Game):
 
         # run the model with the selected pii imputed 
         # and get the reward
-        attack_doc_member, token_ids_member = self.attack_obj.fill_blanks(self.attack_obj.trimmed_member_example, 
-                                                                          self.attack_obj.n_tokens_to_fill_member)
-        self.attack_obj.tokens_member_doc[self.attack_attempt] = token_ids_member
+        attack_doc_target, token_ids_target = self.attack_obj.fill_blanks(self.attack_obj.trimmed_target_example, 
+                                                                          self.attack_obj.n_tokens_to_fill)
+        self.attack_obj.tokens_target_doc[self.attack_attempt] = token_ids_target
         
         target_model = self.attack_obj.target_model.to(self.attack_obj.device)
         target_model.eval()
         
         with no_grad():
             
-            member_feats, member_labels  = self.attack_obj.custom_collate_fn(attack_doc_member)
+            target_feats, target_labels  = self.attack_obj.custom_collate_fn(attack_doc_target)
 
-            logits_member = target_model(member_feats)
-            probs_member = softmax_logits(logits_member.cpu().numpy())
-            probs_of_masks = self.attack_obj.calculate_confidence_for_masked_tokens(probs = probs_member, 
-                                                                                    member_doc = True, 
+            logits_target = target_model(target_feats)
+            probs_target = softmax_logits(logits_target.cpu().numpy())
+            probs_of_masks = self.attack_obj.calculate_confidence_for_masked_tokens(probs = probs_target, 
                                                                                     i_guess=self.attack_attempt)
-            self.attack_obj.confidence_scores_member[self.attack_attempt] = probs_of_masks
+            self.attack_obj.confidence_scores[self.attack_attempt] = probs_of_masks
 
 
         reward = [0 for i in range(self.num_players)]
@@ -140,6 +139,8 @@ class ExtractionGame(Game):
     
     def calculate_correct_choices(self, actions):
         """Counts how many of the chosen actions were the correct ones"""
+        # TODO fix this function to get simpler access to number of correct choices
+        correct_ids = self.attack_obj.get_correct_ids()
         self.n_matches[self.attack_attempt] = sum(1 for x, y in zip(actions, correct_ids) if x == y)
         
     

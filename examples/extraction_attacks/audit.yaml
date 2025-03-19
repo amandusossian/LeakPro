@@ -4,12 +4,12 @@ audit:  # Configurations for auditing
     mastermind:
       training_data_fraction: 0.5  # Fraction of the auxilary dataset to use for this attack (in each shadow model training)
       attack_data_fraction: 0.5 # Fraction of auxiliary dataset to sample from during attack
-      n_filling_attempts: 100 # Number of filling attempts
+      n_filling_attempts: 20 # Number of filling attempts
       attack_strategy: "bandit" # random or bandit
       bandit_parameters: 0
       attack_pool_type: "extended" # using the full pool or another strategy
-      attack_pool_size_extension: 100
-      data_pool_path: "/home/amandus/msc-code/text-anonymization-benchmark/echr_train.json"
+      attack_pool_size_extension: 10
+      data_pool_path: "../../../text_anonymization_benchmark/echr_train.json"
       target_doc_id: 0
     # rmia:
     #   training_data_fraction: 0.5  # Fraction of the auxilary dataset to use for this attack (in each shadow model training)
@@ -61,8 +61,8 @@ target:
   model_class: "TABBERT" 
   # Data paths
   target_folder: "./target"
-  data_path: "../mia/text_mia/tab_data/tab_train_mastermind_dataset.pkl"
-  datapool_path: "../mia/text_mia/tab_data/tab_train_mastermind_dataset.pkl"
+  data_path: "../../../tab_data/tab_train_complete_dataset.pkl"
+  datapool_path: "../../../tab_data/tab_train_complete_dataset.pkl"
 
 shadow_model:
   

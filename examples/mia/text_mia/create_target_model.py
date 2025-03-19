@@ -1,15 +1,18 @@
 import os
 import sys
-project_root = os.path.abspath(os.path.join(os.getcwd(), "../../.."))
-sys.path.append(project_root)
+leakpro_root = os.path.abspath(os.path.join(os.getcwd(), "../../.."))
+alvis_root = os.path.abspath(os.path.join(os.getcwd(), "../../../.."))
+sys.path.append(leakpro_root)
+sys.path.append(alvis_root)
 from examples.mia.text_mia.utils.tabds_data_preparation import *
 from examples.mia.text_mia.utils.tabds_model_preparation import *
 
-path = os.path.join(os.getcwd(), "tab_data/")
+path = os.path.join(alvis_root, "tab_data/")
 dataset = preprocess_tab_dataset(path, 
                                 create_new = True, 
                                 class_masking = True, 
                                 dataset_name = "complete")  
+print("Finished preprocessing dataset")
 
 n_classes = dataset.label_set.n_classes
 train_loader, test_loader = get_tab_dataloaders(dataset, train_fraction=0.4, test_fraction=0.4)

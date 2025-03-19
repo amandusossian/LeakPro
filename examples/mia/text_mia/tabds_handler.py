@@ -62,7 +62,6 @@ class TABInputHandler(AbstractInputHandler):
                 y = labels.to(dev)
                 optimizer.zero_grad()
                 
-                #X_feat = Batch(input_ids=X['input_ids'], attention_masks=X['attention_masks']).to(dev)
                 y_pred = model(X.to(dev))
                 y_pred = y_pred.permute(0,2,1)
                 pred_idx = y_pred.argmax(dim=1)

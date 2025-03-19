@@ -18,7 +18,7 @@ from tokenizers import Encoding
 from torch.nn.utils.rnn import pad_sequence
 
 
-dev = 'cpu' #'cuda' if cuda.is_available() else 'cpu'
+dev = 'cuda' if cuda.is_available() else 'cpu'
 
 IntList = List[int] # A list of token_ids
 IntListList = List[IntList] # A List of List of token_ids, e.g. a Batch
@@ -260,7 +260,7 @@ def preprocess_tab_dataset(datapath, create_new = False, class_masking = False, 
             use_full_dataset (bool): Whether to use the full dataset or a small subset, size 200
     
     """
-
+    print(datapath)
     # Class masking types
     if class_masking: 
         label_set = LabelSet(labels=['PERSON', 'CODE', 'LOC', 'ORG', 'DEM', 'DATETIME', 'QUANTITY', 'MISC'])
@@ -279,6 +279,8 @@ def preprocess_tab_dataset(datapath, create_new = False, class_masking = False, 
     elif dataset_name == "complete":
         raw_data_path = os.path.join(datapath, "tab_train_complete_raw.pkl")
         dataset_path = os.path.join(datapath, "tab_train_complete_dataset.pkl")
+        print('raw path: ', raw_data_path)
+        print('dataset path: ', dataset_path)
         print("Using complete dataset.")
     elif dataset_name == "mastermind":
         raw_data_path = os.path.join(datapath, "tab_train_mastermind_raw.pkl")
@@ -303,7 +305,8 @@ def preprocess_tab_dataset(datapath, create_new = False, class_masking = False, 
             with open(dataset_path, 'wb') as handle:
                 pickle.dump(dataset, handle, protocol=pickle.HIGHEST_PROTOCOL)
             print("Dataset created and saved.")
-
+        else: 
+            print("No raw datafile found.")
     
 
     # otherwise we try to load a dataset

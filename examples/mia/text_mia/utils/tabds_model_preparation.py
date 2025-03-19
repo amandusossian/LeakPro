@@ -92,22 +92,20 @@ def create_trained_model_and_metadata(model, train_loader, test_loader, epochs =
             loss = criterion(y_pred, y)
             loss.backward()
             optimizer.step()
-            #TODO Add more measurements, accuracy is not good on its own in this context
+            
+
             train_acc += pred_idx.eq(y).sum().item() 
             
-            #train_recall += recall_score(y.cpu(), pred_idx.cpu(), average='macro')
-            #train_precision += precision_score(y.cpu(), pred_idx.cpu(), average='macro')
+            
             train_loss += loss.item()
 
         train_loss = train_loss/len(train_loader)
         train_acc = train_acc/len(train_loader.dataset)
-        #train_recall = train_recall/len(train_loader)
-        #train_precision = train_precision/len(train_loader)
+    
         
         train_losses.append(train_loss)
         train_accuracies.append(train_acc)
-        #train_recalls.append(train_recall)
-        #train_precisions.append(train_precision)
+
         
         print("Evaluating")
         test_loss, test_acc, test_recall, test_precision = evaluate(model, test_loader, criterion, dev)
