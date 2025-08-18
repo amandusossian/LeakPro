@@ -1,0 +1,45 @@
+2025-08-12 16:46:46,648 INFO     Target model blueprint created from TABBERT in ../mia/text_mia/utils/tabds_model_preparation.py.
+2025-08-12 16:46:46,697 INFO     Loaded target model metadata from ./target/model_metadata.pkl
+/apps/Arch/software/PyTorch/2.1.2-foss-2023a-CUDA-12.1.1/lib/python3.11/site-packages/torch/_utils.py:831: UserWarning: TypedStorage is deprecated. It will be removed in the future and UntypedStorage will be the only storage class. This should only matter to you if you are using storages directly.  To access UntypedStorage directly, use tensor.untyped_storage() instead of tensor.storage()
+  return self.fget.__get__(instance, owner)()
+2025-08-12 16:46:54,783 INFO     Loaded target model from ./target
+2025-08-12 16:47:08,453 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-08-12 16:47:08,453 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-08-12 16:47:08,453 INFO     Creating shadow model handler singleton
+2025-08-12 16:47:08,455 INFO     Creating distillation model handler singleton
+2025-08-12 16:47:08,758 INFO     Added attack: mastermind
+2025-08-12 16:47:08,758 INFO     Preparing attack: mastermind
+2025-08-12 16:47:10,811 INFO     Running attack: mastermind
+2025-08-12 16:47:10,811 INFO     Gathering statistics from the training data
+TABInputHandler initialized.
+  0%|          | 0/10 [00:00<?, ?it/s] 10%|█         | 1/10 [00:08<01:15,  8.41s/it] 20%|██        | 2/10 [00:08<00:28,  3.57s/it] 30%|███       | 3/10 [00:08<00:14,  2.02s/it] 40%|████      | 4/10 [00:08<00:07,  1.30s/it] 50%|█████     | 5/10 [00:12<00:10,  2.13s/it] 60%|██████    | 6/10 [00:15<00:09,  2.32s/it] 70%|███████   | 7/10 [00:18<00:07,  2.60s/it] 80%|████████  | 8/10 [00:20<00:04,  2.30s/it] 90%|█████████ | 9/10 [00:20<00:01,  1.62s/it]100%|██████████| 10/10 [00:22<00:00,  1.81s/it]100%|██████████| 10/10 [00:22<00:00,  2.25s/it]
+2025-08-12 16:47:34,635 INFO     Gathered statistics done. 6 different documets out of 100
+n_seen_masks: 180
+n_seen_docs: 6
+> /cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/mastermind.py(1242)gather_statistics()
+-> np.save('entity_wise_probs.npy', entity_wise_probs)
+(Pdb) 
+Traceback (most recent call last):
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/./run_extraction_attack.py", line 14, in <module>
+    leakpro.run_audit()
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/leakpro/leakpro.py", line 131, in run_audit
+    audit_results = self.attack_scheduler.run_attacks()
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/leakpro/attacks/attack_scheduler.py", line 63, in run_attacks
+    result = attack.run_attack()
+             ^^^^^^^^^^^^^^^^^^^
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/mastermind.py", line 338, in run_attack
+    self.gather_statistics()
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/mastermind.py", line 1242, in gather_statistics
+    np.save('entity_wise_probs.npy', entity_wise_probs)
+    ^^
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/mastermind.py", line 1242, in gather_statistics
+    np.save('entity_wise_probs.npy', entity_wise_probs)
+    ^^
+  File "/apps/Arch/software/Python/3.11.3-GCCcore-12.3.0/lib/python3.11/bdb.py", line 90, in trace_dispatch
+    return self.dispatch_line(frame)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/apps/Arch/software/Python/3.11.3-GCCcore-12.3.0/lib/python3.11/bdb.py", line 115, in dispatch_line
+    if self.quitting: raise BdbQuit
+                      ^^^^^^^^^^^^^
+bdb.BdbQuit

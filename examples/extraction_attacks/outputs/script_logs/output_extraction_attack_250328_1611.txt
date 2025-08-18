@@ -1,0 +1,30 @@
+2025-03-28 16:11:39,451 INFO     Target model blueprint created from TABBERT in ../mia/text_mia/utils/tabds_model_preparation.py.
+2025-03-28 16:11:39,533 INFO     Loaded target model metadata from ./target/model_metadata.pkl
+/apps/Arch/software/PyTorch/2.1.2-foss-2023a-CUDA-12.1.1/lib/python3.11/site-packages/torch/_utils.py:831: UserWarning: TypedStorage is deprecated. It will be removed in the future and UntypedStorage will be the only storage class. This should only matter to you if you are using storages directly.  To access UntypedStorage directly, use tensor.untyped_storage() instead of tensor.storage()
+  return self.fget.__get__(instance, owner)()
+2025-03-28 16:11:49,063 INFO     Loaded target model from ./target
+2025-03-28 16:12:03,583 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-03-28 16:12:03,583 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-03-28 16:12:03,583 INFO     Creating shadow model handler singleton
+2025-03-28 16:12:03,584 INFO     Creating distillation model handler singleton
+2025-03-28 16:12:07,074 INFO     Added attack: mastermind
+2025-03-28 16:12:07,074 INFO     Preparing attack: mastermind
+2025-03-28 16:12:07,074 INFO     Running attack: mastermind
+2025-03-28 16:12:07,270 INFO     Using bandit approach
+2025-03-28 16:12:07,270 INFO     Using Tsallis inf sampling strategy
+TABInputHandler initialized.
+  0%|          | 0/50 [00:00<?, ?it/s]  2%|▏         | 1/50 [00:00<00:28,  1.75it/s]  4%|▍         | 2/50 [00:00<00:21,  2.20it/s]  6%|▌         | 3/50 [00:01<00:19,  2.40it/s]  8%|▊         | 4/50 [00:01<00:18,  2.50it/s] 10%|█         | 5/50 [00:02<00:20,  2.22it/s] 12%|█▏        | 6/50 [00:02<00:18,  2.36it/s] 14%|█▍        | 7/50 [00:02<00:17,  2.46it/s] 16%|█▌        | 8/50 [00:03<00:16,  2.52it/s] 18%|█▊        | 9/50 [00:03<00:15,  2.57it/s] 20%|██        | 10/50 [00:04<00:15,  2.60it/s] 22%|██▏       | 11/50 [00:04<00:14,  2.62it/s] 24%|██▍       | 12/50 [00:04<00:14,  2.64it/s] 26%|██▌       | 13/50 [00:05<00:13,  2.65it/s] 28%|██▊       | 14/50 [00:05<00:13,  2.66it/s] 30%|███       | 15/50 [00:05<00:13,  2.67it/s] 32%|███▏      | 16/50 [00:06<00:12,  2.67it/s] 34%|███▍      | 17/50 [00:06<00:12,  2.69it/s] 36%|███▌      | 18/50 [00:07<00:11,  2.69it/s] 38%|███▊      | 19/50 [00:07<00:11,  2.69it/s] 40%|████      | 20/50 [00:07<00:11,  2.69it/s] 42%|████▏     | 21/50 [00:08<00:10,  2.69it/s] 44%|████▍     | 22/50 [00:08<00:10,  2.69it/s] 46%|████▌     | 23/50 [00:08<00:10,  2.69it/s] 48%|████▊     | 24/50 [00:09<00:09,  2.68it/s] 50%|█████     | 25/50 [00:09<00:09,  2.68it/s] 52%|█████▏    | 26/50 [00:10<00:08,  2.69it/s] 54%|█████▍    | 27/50 [00:10<00:08,  2.68it/s] 56%|█████▌    | 28/50 [00:10<00:08,  2.68it/s] 58%|█████▊    | 29/50 [00:11<00:07,  2.68it/s] 60%|██████    | 30/50 [00:11<00:07,  2.68it/s] 62%|██████▏   | 31/50 [00:11<00:07,  2.68it/s] 64%|██████▍   | 32/50 [00:12<00:06,  2.68it/s] 66%|██████▌   | 33/50 [00:12<00:06,  2.68it/s] 68%|██████▊   | 34/50 [00:13<00:05,  2.68it/s] 70%|███████   | 35/50 [00:13<00:05,  2.68it/s] 72%|███████▏  | 36/50 [00:13<00:05,  2.68it/s] 74%|███████▍  | 37/50 [00:14<00:04,  2.67it/s] 76%|███████▌  | 38/50 [00:14<00:04,  2.67it/s] 78%|███████▊  | 39/50 [00:14<00:04,  2.67it/s] 80%|████████  | 40/50 [00:15<00:03,  2.67it/s] 82%|████████▏ | 41/50 [00:15<00:03,  2.67it/s] 84%|████████▍ | 42/50 [00:16<00:02,  2.67it/s] 86%|████████▌ | 43/50 [00:16<00:02,  2.66it/s] 88%|████████▊ | 44/50 [00:16<00:02,  2.66it/s] 90%|█████████ | 45/50 [00:17<00:01,  2.66it/s] 92%|█████████▏| 46/50 [00:17<00:01,  2.66it/s] 94%|█████████▍| 47/50 [00:17<00:01,  2.65it/s] 96%|█████████▌| 48/50 [00:18<00:00,  2.66it/s] 98%|█████████▊| 49/50 [00:18<00:00,  2.66it/s]100%|██████████| 50/50 [00:19<00:00,  2.66it/s]100%|██████████| 50/50 [00:19<00:00,  2.63it/s]
+2025-03-28 16:12:26,318 INFO     Iterations Completed
+2025-03-28 16:12:26,335 INFO     Number of completely correctly identified PII after 50 evaluations are 4/71 = 5.63%.
+2025-03-28 16:12:26,335 INFO     Number of *almost* correctly identified PII after 50 evaluations are 17/71 = 23.94%.
+2025-03-28 16:12:26,341 INFO     Text written to best_estimate_text.txt
+2025-03-28 16:12:26,344 INFO     Finished attack: mastermind
+2025-03-28 16:12:26,344 INFO     Preparing results for attack: mastermind
+Traceback (most recent call last):
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/./run_extraction_attack.py", line 14, in <module>
+    leakpro.run_audit()
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/leakpro/leakpro.py", line 136, in run_audit
+    prepare_privacy_risk_report(
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/leakpro/reporting/utils.py", line 32, in prepare_privacy_risk_report
+    raise ValueError("Please provide the audit results")
+ValueError: Please provide the audit results

@@ -1,0 +1,15 @@
+2025-08-12 16:21:18,639 INFO     Target model blueprint created from TABBERT in ../mia/text_mia/utils/tabds_model_preparation.py.
+2025-08-12 16:21:18,688 INFO     Loaded target model metadata from ./target/model_metadata.pkl
+/apps/Arch/software/PyTorch/2.1.2-foss-2023a-CUDA-12.1.1/lib/python3.11/site-packages/torch/_utils.py:831: UserWarning: TypedStorage is deprecated. It will be removed in the future and UntypedStorage will be the only storage class. This should only matter to you if you are using storages directly.  To access UntypedStorage directly, use tensor.untyped_storage() instead of tensor.storage()
+  return self.fget.__get__(instance, owner)()
+2025-08-12 16:21:26,581 INFO     Loaded target model from ./target
+2025-08-12 16:21:41,540 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-08-12 16:21:41,541 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-08-12 16:21:41,541 INFO     Creating shadow model handler singleton
+2025-08-12 16:21:41,541 INFO     Creating distillation model handler singleton
+2025-08-12 16:21:41,898 INFO     Added attack: mastermind
+2025-08-12 16:21:41,898 INFO     Preparing attack: mastermind
+2025-08-12 16:21:44,443 INFO     Running attack: mastermind
+2025-08-12 16:21:44,444 INFO     Gathering statistics from the training data
+TABInputHandler initialized.
+  0%|          | 0/10 [00:00<?, ?it/s] 10%|█         | 1/10 [00:32<04:49, 32.12s/it] 20%|██        | 2/10 [00:32<01:48, 13.59s/it] 30%|███       | 3/10 [00:33<00:53,  7.58s/it] 40%|████      | 4/10 [00:33<00:28,  4.75s/it]

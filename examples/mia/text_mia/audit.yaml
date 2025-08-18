@@ -51,7 +51,7 @@ target:
   model_class: "TABBERT" 
   # Data paths
   target_folder: "./target"
-  data_path: "/Users/reimera/Desktop/alvis/tab_data/"
+  data_path: "/cephyr/users/reimera/Alvis/projects/tab_data/tab_train_complete_dataset.pkl"
 
 shadow_model:
   

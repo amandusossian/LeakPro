@@ -1,31 +1,0 @@
-2025-03-19 10:15:05,528 INFO     Target model blueprint created from TABBERT in ../mia/text_mia/utils/tabds_model_preparation.py.
-2025-03-19 10:15:05,948 INFO     Loaded target model metadata from ./target/model_metadata.pkl
-/apps/Arch/software/PyTorch/2.1.2-foss-2023a-CUDA-12.1.1/lib/python3.11/site-packages/torch/_utils.py:831: UserWarning: TypedStorage is deprecated. It will be removed in the future and UntypedStorage will be the only storage class. This should only matter to you if you are using storages directly.  To access UntypedStorage directly, use tensor.untyped_storage() instead of tensor.storage()
-  return self.fget.__get__(instance, owner)()
-2025-03-19 10:15:13,333 INFO     Loaded target model from ./target
-2025-03-19 10:15:36,096 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
-2025-03-19 10:15:36,096 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
-2025-03-19 10:15:36,097 INFO     Creating shadow model handler singleton
-2025-03-19 10:15:36,098 INFO     Creating distillation model handler singleton
-2025-03-19 10:15:36,779 INFO     Added attack: mastermind
-2025-03-19 10:15:36,779 INFO     Preparing attack: mastermind
-2025-03-19 10:15:36,779 INFO     Running attack: mastermind
-2025-03-19 10:15:36,779 INFO     Using Tsallis inf sampling strategy
-../../../text_anonymization_benchmark/echr_train.json
-True
-/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks
-  0%|          | 0/20 [00:00<?, ?it/s]  5%|▌         | 1/20 [00:05<01:38,  5.17s/it] 10%|█         | 2/20 [00:10<01:30,  5.03s/it] 15%|█▌        | 3/20 [00:15<01:27,  5.13s/it] 20%|██        | 4/20 [00:20<01:24,  5.27s/it] 25%|██▌       | 5/20 [00:26<01:20,  5.40s/it] 30%|███       | 6/20 [00:32<01:16,  5.49s/it] 35%|███▌      | 7/20 [00:37<01:12,  5.55s/it] 40%|████      | 8/20 [00:43<01:05,  5.48s/it] 45%|████▌     | 9/20 [00:48<01:00,  5.50s/it] 50%|█████     | 10/20 [00:54<00:55,  5.51s/it] 55%|█████▌    | 11/20 [00:59<00:49,  5.52s/it] 60%|██████    | 12/20 [01:05<00:44,  5.58s/it] 65%|██████▌   | 13/20 [01:10<00:38,  5.53s/it] 70%|███████   | 14/20 [01:16<00:33,  5.50s/it] 75%|███████▌  | 15/20 [01:21<00:27,  5.45s/it] 80%|████████  | 16/20 [01:26<00:21,  5.41s/it] 85%|████████▌ | 17/20 [01:32<00:16,  5.37s/it] 90%|█████████ | 18/20 [01:37<00:10,  5.35s/it] 95%|█████████▌| 19/20 [01:42<00:05,  5.31s/it]100%|██████████| 20/20 [01:48<00:00,  5.30s/it]100%|██████████| 20/20 [01:48<00:00,  5.40s/it]
-2025-03-19 10:17:24,845 INFO     Iterations Completed
-2025-03-19 10:17:24,919 INFO     Finished attack: mastermind
-2025-03-19 10:17:24,919 INFO     Preparing results for attack: mastermind
-Number of completely correct identified tokens after 20 evaluations are 0,
-which is an accuracy of 0.0000%.
-Results printed
-Traceback (most recent call last):
-  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/./run_extraction_attack.py", line 14, in <module>
-    leakpro.run_audit()
-  File "/cephyr/users/reimera/Alvis/projects/LeakPro/leakpro/leakpro.py", line 136, in run_audit
-    prepare_privacy_risk_report(
-  File "/cephyr/users/reimera/Alvis/projects/LeakPro/leakpro/reporting/utils.py", line 32, in prepare_privacy_risk_report
-    raise ValueError("Please provide the audit results")
-ValueError: Please provide the audit results

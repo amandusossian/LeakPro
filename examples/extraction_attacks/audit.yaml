@@ -4,39 +4,47 @@ audit:  # Configurations for auditing
     mastermind:
       training_data_fraction: 0.5  # Fraction of the auxilary dataset to use for this attack (in each shadow model training)
       attack_data_fraction: 0.5 # Fraction of auxiliary dataset to sample from during attack
-      n_filling_attempts: 20 # Number of filling attempts
-      attack_strategy: "bandit" # random or bandit
-      bandit_parameters: 0
+      n_filling_attempts: 100 # Number of attempts to fill the mask 
+      global_attack_pool: False
       attack_pool_type: "extended" # using the full pool or another strategy
-      attack_pool_size_extension: 10
-      data_pool_path: "../../../text_anonymization_benchmark/echr_train.json"
-      target_doc_id: 0
-    # rmia:
-    #   training_data_fraction: 0.5  # Fraction of the auxilary dataset to use for this attack (in each shadow model training)
-    #   attack_data_fraction: 0.5 # Fraction of auxiliary dataset to sample from during attack
-    #   num_shadow_models: 4 # Number of shadow models to train
-    #   online: True # perform online or offline attack
-    #   temperature: 2
-    #   gamma: 1.0
-    #   offline_a: 0.33 # parameter from which we compute p(x) from p_OUT(x) such that p_IN(x) = a p_OUT(x) + b.
-    #   offline_b: 0.66
-    # qmia:
-    #  training_data_fraction: 1.0  # Fraction of the auxilary dataset (data without train and test indices) to use for training the quantile regressor
-    #  epochs: 5  # Number of training epochs for quantile regression
-    # population:
-    #  attack_data_fraction: 1.0  # Fraction of the auxilary dataset to use for this attack
-    # lira:
-    #   training_data_fraction: 0.5  # Fraction of the auxilary dataset to use for this attack (in each shadow model training)
-    #   num_shadow_models: 4 # Number of shadow models to train
-    #   online: False # perform online or offline attack
-    #   fixed_variance: True # Use a fixed variance for the whole audit
-    #   boosting: True
-    #   batch_size: 1
-    #loss_traj:
-    #  training_distill_data_fraction : 0.7 # Fraction of the auxilary dataset to use for training the distillation models D_s = (1-D_KD)/2
-    #  number_of_traj: 10 # Number of epochs (number of points in the loss trajectory)
-    #  label_only: False # True or False
-    #  mia_classifier_epochs: 100
+      attack_pool_size_extension: 5  
+      data_pool_path: "../../../text_anonymization_benchmark/echr_test.json"
+      target_doc_idx: 0
+      attack_strategy: "random" # random, bandit
+      bandit_sampling_alg: "tsallis" # ucb or epsilon_greedy 
+      bandit_parameters: 
+        tsallis_reward_factor: 1
+      exact_matching_confidence: False
+
+      gather_context_free_statistics : False # Gathers stats about how the models confidence of the masks without any context
+
+      limit_masks: False
+      n_mask_limit: 6
+      
+      single_investigation: False # If True, we will run the attack on a doc and save the results of a single mask as more and more other masks are revealed
+      single_mask_idx: 0 # The mask id to use for the single mask attack
+      
+      multi_run_averaging: False # If True, we will average the results over multiple runs
+      multi_run_parameters: 
+        n_docs: 20 # Number of runs to average over
+        entity_type_id: 7 # The entity type to investigate in the averaging
+        save_path: "./mastermind_results" # Path to save the results of the mastermind attack
+        correct_fraction: 0.5 # Fraction of other masks to set correct
+        randomize_doc_idxs: True # If True, we will use random document ids for the multi-run averaging
+
+      expanding_window: True # If True, we will use an expanding window for the attack
+      ew_entity_type_id: 5 # The entity type to use for the expanding window attack
+      ew_single_entity_bool: True # If True, we investigate a single entity for the expanding window attack
+      ew_single_entity_random_mask_bool:  False # If True, we will use a random target mask for the expanding window attack instead of the one above
+      ew_single_entity_mask_idx: 0 # The target mask id to use for the expanding window
+      ew_single_entity_set_rest_correct_bool: False # If True, we will randomize the rest of the masks in the expanding window attack, otherwise they will be set to the correct tokens
+      
+      ew_centered_single: True
+      ew_centered_single_mask_idx: 0 # The mask id to use for the centered single mask attack
+      ew_single_entity_replace_target_bool: True # If True, we will replace the target mask with a random mask and evaluate the performance with.
+
+
+
 
   output_dir: "./leakpro_output"
   attack_type: "mia" #mia, gia, extract

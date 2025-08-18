@@ -157,8 +157,16 @@ def get_labels(self:Self, dataset_indices: np.ndarray, batch_size: int = 32) -> 
 
     # Initialize an empty list to store the labels
     all_labels = []
-
+    
+    #NOTE Maybe needs to change the dataloader again...
+    modality = 'fda'
+    if modality == 'text':
+        for data in dataloader:
+            labels = data['labels'] 
+            all_labels.append(labels.cpu().numpy())  # Convert labels from tensors to NumPy arrays     
+    
     # Iterate over the DataLoader to extract the labels
+ 
     for _, labels in dataloader:
         all_labels.append(labels.cpu().numpy())  # Convert labels from tensors to NumPy arrays
 

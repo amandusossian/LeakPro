@@ -129,8 +129,12 @@ class LeakPro:
     def run_audit(self:Self) -> None:
         """Run the audit."""
         audit_results = self.attack_scheduler.run_attacks()
-
+       
         for attack_name in audit_results:
+            if attack_name == "mastermind":
+                logger.info("No audit results for mastermind attack as of now, continuing. ")
+                continue
+
             logger.info(f"Preparing results for attack: {attack_name}")
 
             prepare_privacy_risk_report(

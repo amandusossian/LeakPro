@@ -1,0 +1,22 @@
+2025-08-12 16:51:19,703 INFO     Target model blueprint created from TABBERT in ../mia/text_mia/utils/tabds_model_preparation.py.
+2025-08-12 16:51:19,752 INFO     Loaded target model metadata from ./target/model_metadata.pkl
+/apps/Arch/software/PyTorch/2.1.2-foss-2023a-CUDA-12.1.1/lib/python3.11/site-packages/torch/_utils.py:831: UserWarning: TypedStorage is deprecated. It will be removed in the future and UntypedStorage will be the only storage class. This should only matter to you if you are using storages directly.  To access UntypedStorage directly, use tensor.untyped_storage() instead of tensor.storage()
+  return self.fget.__get__(instance, owner)()
+2025-08-12 16:51:26,014 INFO     Loaded target model from ./target
+2025-08-12 16:51:39,983 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-08-12 16:51:39,983 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-08-12 16:51:39,983 INFO     Creating shadow model handler singleton
+2025-08-12 16:51:39,985 INFO     Creating distillation model handler singleton
+2025-08-12 16:51:40,197 INFO     Added attack: mastermind
+2025-08-12 16:51:40,197 INFO     Preparing attack: mastermind
+2025-08-12 16:51:42,228 INFO     Running attack: mastermind
+2025-08-12 16:51:42,228 INFO     Gathering statistics from the training data
+TABInputHandler initialized.
+  0%|          | 0/10 [00:00<?, ?it/s] 10%|█         | 1/10 [00:08<01:15,  8.42s/it] 20%|██        | 2/10 [00:08<00:28,  3.58s/it] 30%|███       | 3/10 [00:08<00:14,  2.03s/it] 40%|████      | 4/10 [00:08<00:07,  1.30s/it] 50%|█████     | 5/10 [00:12<00:10,  2.14s/it] 60%|██████    | 6/10 [00:15<00:09,  2.33s/it] 70%|███████   | 7/10 [00:18<00:07,  2.60s/it] 80%|████████  | 8/10 [00:20<00:04,  2.30s/it] 90%|█████████ | 9/10 [00:20<00:01,  1.62s/it]100%|██████████| 10/10 [00:22<00:00,  1.81s/it]100%|██████████| 10/10 [00:22<00:00,  2.25s/it]
+2025-08-12 16:52:06,119 INFO     Gathered statistics done. 6 different documets out of 100
+2025-08-12 16:52:06,121 INFO     Gathering statistics done.
+2025-08-12 16:52:06,121 INFO     Finished attack: mastermind
+2025-08-12 16:52:06,121 INFO     No audit results for mastermind attack as of now, continuing. 
+2025-08-12 16:52:06,121 INFO     Auditing completed
+n_seen_masks: 180
+n_seen_docs: 6

@@ -188,3 +188,7 @@ class GIAResults:
         save_image(gt_denormalized, os.path.join(save_path, "original_image.png"))
 
         return attack_name
+
+
+class MMResults: 
+    pass

@@ -16,6 +16,7 @@ class TABInputHandler(AbstractInputHandler):
 
     def __init__(self, configs: dict) -> None:
         super().__init__(configs = configs)
+        print("TABInputHandler initialized.")
 
 
     def get_criterion(self)->None:
@@ -55,27 +56,43 @@ class TABInputHandler(AbstractInputHandler):
 
         train_acc, train_loss = 0.0, 0.0
         # Training loop
-        for e in tqdm(range(epochs), desc="Training Progress"):
+        print("Training loop started.")
+        for e in range(epochs):
             
             model.train()    
-            for X, labels in tqdm(dataloader):
-                y = labels.to(dev)
-                optimizer.zero_grad()
-                
-                y_pred = model(X.to(dev))
-                y_pred = y_pred.permute(0,2,1)
-                pred_idx = y_pred.argmax(dim=1)
+            batch_counter = 0
+            n_updates = 5
+            for batch in dataloader:
 
-                loss = criterion(y_pred, y)
+                batch_counter += 1
+                if batch_counter % int(len(dataloader) / n_updates )  == 0 and batch_counter != 0:
+                    print("Batch", str(batch_counter) + "/" + str(len(dataloader)), "completed")
+                    
+                optimizer.zero_grad()
+
+                input_ids = batch['input_ids'].to(dev)            
+                attention_masks = batch['attention_masks'].to(dev)
+                labels = batch['labels'].to(dev)
+
+                logits = model(input_ids, attention_masks)
+
+                pred_idx = logits.argmax(dim=-1)
+                loss = criterion(logits.view(-1, logits.shape[-1]), labels.view(-1))
                 loss.backward()
+            
                 optimizer.step()
-                train_acc += pred_idx.eq(y).sum().item()
+            
                 train_loss += loss.item()
+                # Accuracy calculation
+                train_acc += pred_idx.eq(labels).sum().item() 
+                
 
             print('Epoch', int(e + 1), "done.")
             print('Avg training loss: {0:.2f}'.format(train_loss/(len(dataloader.dataset)*(e+1))))
-
-        train_acc = train_acc/len(dataloader.dataset)
+            
+        n_tokens = logits.shape[1]
+        train_acc = train_acc/(len(dataloader.dataset) * n_tokens) 
+        #However, this does not account for the padding tokens. Can add that later.
         train_loss = train_loss/len(dataloader)
 
         return {"model": model, "metrics": {"accuracy": train_acc, "loss": train_loss}}

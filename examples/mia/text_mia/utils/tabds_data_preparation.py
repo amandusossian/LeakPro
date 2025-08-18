@@ -1,7 +1,6 @@
 import os
 import sys
 import numpy as np
-import pandas as pd
 import joblib
 import pickle
 from sklearn.preprocessing import LabelEncoder, StandardScaler, OneHotEncoder
@@ -31,6 +30,7 @@ class TrainingExample:
     identifier_types: IntList
     offsets:IntList
     entity_types: IntList
+
 
 class LabelSet:
     def __init__(self, labels: List[str]):
@@ -62,17 +62,214 @@ class LabelSet:
 
 
     def get_aligned_label_ids_from_annotations(self, tokenized_text, annotations, ids):
-        raw_labels, identifier_types, offsets, ids, entities = align_tokens_and_annotations_bilou(tokenized_text, annotations, ids, self.class_masking)
+        raw_labels, identifier_types, offsets, ids, entities = align_tokens_and_annotations_bilou(tokenized_text, 
+                                                                                                  annotations, 
+                                                                                                  ids, 
+                                                                                                  self.class_masking)
+        
         return list(map(self.labels_to_id.get, raw_labels)), identifier_types, offsets, ids, entities
 
-class TABDataset(Dataset):
+class TABDataset(Dataset):  
 
     def __init__(
             self,
             data: Any,
             label_set: LabelSet,
             tokenizer: PreTrainedTokenizerFast,
-            tokens_per_batch=32,
+            tokens_per_batch=4096,
+            window_stride=None            
+        ):
+            self.label_set = label_set
+            self.class_masking = label_set.class_masking
+            self.tokens_per_batch = tokens_per_batch
+            self.window_stride = tokens_per_batch if window_stride is None else window_stride
+            self.tokenizer = tokenizer
+            self.texts = []
+            self.annotations = []
+            self.n_classes = label_set.n_classes
+            ids = []
+            self.collate_fn = None #self.custom_collate_fn
+            ood_data = False
+
+            for example in data:
+                self.texts.append(example["text"])
+                #self.annotations.append(example['annotations'])
+                self.annotations.append(example["annotations"])
+                ids.append(example['doc_id'])
+
+            ### TOKENIZE All THE DATA
+            tokenized_batch = self.tokenizer(self.texts, 
+                                                add_special_tokens=True, 
+                                                padding = 'longest',
+                                                truncation=True,
+                                                max_length = tokens_per_batch, 
+                                                return_attention_mask=True,
+                                                return_tensors='pt',
+                                                return_offsets_mapping=True)
+            
+            
+
+            ## This is used to keep track of the offsets of the tokens, 
+            # and used to calculate the offsets on the entity level at evaluation time.
+            # NOTE commented
+            # offset_mapping = []
+            # for x,y in zip(ids, tokenized_batch.offset_mapping):
+            #     l = []
+            #     for tpl in y:
+            #         l.append((x, tpl[0], tpl[1]))
+            #     offset_mapping.append(l)
+
+            ###ALIGN LABELS ONE EXAMPLE AT A TIME
+
+            if self.class_masking:
+                raw_labels=['PERSON', 'CODE', 'LOC', 'ORG', 'DEM', 'DATETIME', 'QUANTITY', 'MISC']
+            else:
+                raw_labels = ['MASK']
+
+            conversion_dict = {i: label for i, label in enumerate(raw_labels)}
+            conversion_dict[-1] = -1
+            reverse_conversion_dict = {v: k for k, v in conversion_dict.items()}
+
+            aligned_labels = []
+            identifiers = []
+            o = []
+            aligned_entities = []
+            for ix in range(len(tokenized_batch.encodings)):
+                encoding = tokenized_batch.encodings[ix]
+                raw_annotations = self.annotations[ix]
+                aligned, identifier_types, outs, ids, entities= label_set.get_aligned_label_ids_from_annotations(
+                    encoding, raw_annotations, ids
+                )
+                aligned_labels.append(aligned)
+                identifiers.append(identifier_types)
+                # o.append(outs)
+                converted_entities = [reverse_conversion_dict[e] for e in entities]
+               
+                
+                aligned_entities.append(converted_entities) # Change here to be a int list instead of strings
+
+
+            ###END OF LABEL ALIGNMENT
+
+            ###MAKE A LIST OF TRAINING EXAMPLES.
+            self.training_examples: List[TrainingExample] = []
+            offset_mapping = [-1]*len(tokenized_batch.encodings[0].ids)
+            empty_label_id = "O"
+            for encoding, label, identifier_type, mapping, entity_class  in zip(tokenized_batch.encodings, 
+                                                                                aligned_labels, 
+                                                                                identifiers, 
+                                                                                offset_mapping, 
+                                                                                aligned_entities):
+                length = len(label)  # How long is this sequence
+                for start in range(0, length, self.window_stride):
+                    end = min(start + tokens_per_batch, length)
+                    current_encodings = encoding.ids[start:end]
+                    
+                    # If only self.tokenizer.pad_token_id are in the window, dont add training example 
+                    if all(x == self.tokenizer.pad_token_id for x in current_encodings):
+                        continue
+                    
+                    # Add more padding. Looks good.                                                      
+                    padding_to_add = self.window_stride - (end-start)  
+                        
+                    self.training_examples.append(
+                        TrainingExample(
+                            # Record the tokens
+                            input_ids=current_encodings  # The ids of the tokens
+                            + [self.tokenizer.pad_token_id] * padding_to_add,  # padding if needed
+                            labels=( 
+                                label[start:end] + [-1] * padding_to_add
+                                # padding if needed
+                            ),
+                            attention_masks=(
+                                encoding.attention_mask[start:end]
+                                + [0] * padding_to_add  # 0'd attention masks where we added padding
+                            ),
+                            identifier_types=(identifier_type[start:end]
+                                + [-1] * padding_to_add ##Not used 
+                            
+                            ),
+                            #offsets=(mapping[start:end]    + [-1] * padding_to_add
+                            offsets = (
+                                [-1] * self.window_stride #Changed since I dont use the offsets
+                            ),
+                            entity_types = entity_class[start:end] + [-1] * padding_to_add
+
+                        )
+
+
+                    )
+                    
+
+
+    def __len__(self):
+        return len(self.training_examples)
+
+
+    def __getitem__(self, idx) -> dict:
+        # Retrieve the TrainingExample from the dataset
+        ex = self.training_examples[idx]
+
+        # Convert fields to tensors (do the padding if necessary) 
+        
+        input_ids = tensor(ex.input_ids, dtype=long)
+        attention_masks = tensor(ex.attention_masks, dtype=long)
+        labels = tensor(ex.labels, dtype=long)
+        identifier_types = ex.identifier_types
+        #offsets= ex.offsets
+
+        # Return dict 
+        return {
+            'input_ids': input_ids,
+            'attention_masks': attention_masks,
+            'identifier_types': identifier_types, 
+            # 'offsets': offsets  , 
+            'entity_types': ex.entity_types, 
+            'labels': labels
+
+        }
+
+
+    def subset(self, indices):
+
+       
+        # Create a new Dataset instance to hold the subset
+        subset_data = TABDataset.__new__(TABDataset)  # Bypass __init__
+
+        # Directly subset the relevant fields from the original dataset
+        
+        
+        subset_data.training_examples = [self.training_examples[i] for i in indices]
+        # Copy the tokenizer, label_set, tokens_per_batch, and window_stride
+        subset_data.tokenizer = self.tokenizer
+        subset_data.tokens_per_batch = self.tokens_per_batch
+        subset_data.window_stride = self.window_stride
+        subset_data.label_set = self.label_set
+        subset_data.n_classes = self.n_classes  
+        subset_data.class_masking = self.n_classes>3
+
+        return subset_data
+    
+    def custom_collate_fn(self, batch):
+        input_ids = [item[0]['input_ids'] for item in batch]
+        attention_masks = [item[0]['attention_masks'] for item in batch]
+        labels = [item[1] for item in batch]
+        
+        input_ids = pad_sequence(input_ids, batch_first=True, padding_value=self.tokenizer.pad_token_id)
+        attention_masks = pad_sequence(attention_masks, batch_first=True, padding_value=0)
+        labels = pad_sequence(labels, batch_first=True, padding_value=-1)
+        
+        
+        return Batch(input_ids = input_ids, attention_masks = attention_masks), labels
+
+class TABDataset_old(Dataset):
+
+    def __init__(
+            self,
+            data: Any,
+            label_set: LabelSet,
+            tokenizer: PreTrainedTokenizerFast,
+            tokens_per_batch=4096,
             window_stride=None            
         ):
             self.label_set = label_set
@@ -93,8 +290,17 @@ class TABDataset(Dataset):
                 self.annotations.append(example["annotations"])
                 ids.append(example['doc_id'])
 
-            ###TOKENIZE All THE DATA
-            tokenized_batch = self.tokenizer(self.texts, add_special_tokens=True, padding = True, return_offsets_mapping=True)
+            ### TOKENIZE All THE DATA
+            tokenized_batch = self.tokenizer(self.texts, 
+                                                add_special_tokens=True, 
+                                                padding = 'longest',
+                                                truncation=True,
+                                                max_length = tokens_per_batch, 
+                                                return_attention_mask=True,
+                                                return_tensors='pt',
+                                                return_offsets_mapping=True)
+            
+            
 
             ## This is used to keep track of the offsets of the tokens, 
             # and used to calculate the offsets on the entity level at evaluation time.
@@ -173,7 +379,6 @@ class TABDataset(Dataset):
         ex = self.training_examples[idx]
 
         # Convert fields to tensors (do the padding if necessary) 
-        #NOTE removed to device from here
         
         input_ids = tensor(ex.input_ids, dtype=long)
         attention_masks = tensor(ex.attention_masks, dtype=long)
@@ -260,7 +465,6 @@ def preprocess_tab_dataset(datapath, create_new = False, class_masking = False, 
             use_full_dataset (bool): Whether to use the full dataset or a small subset, size 200
     
     """
-    print(datapath)
     # Class masking types
     if class_masking: 
         label_set = LabelSet(labels=['PERSON', 'CODE', 'LOC', 'ORG', 'DEM', 'DATETIME', 'QUANTITY', 'MISC'])
@@ -279,8 +483,6 @@ def preprocess_tab_dataset(datapath, create_new = False, class_masking = False, 
     elif dataset_name == "complete":
         raw_data_path = os.path.join(datapath, "tab_train_complete_raw.pkl")
         dataset_path = os.path.join(datapath, "tab_train_complete_dataset.pkl")
-        print('raw path: ', raw_data_path)
-        print('dataset path: ', dataset_path)
         print("Using complete dataset.")
     elif dataset_name == "mastermind":
         raw_data_path = os.path.join(datapath, "tab_train_mastermind_raw.pkl")
@@ -296,12 +498,13 @@ def preprocess_tab_dataset(datapath, create_new = False, class_masking = False, 
     if create_new: 
         print("Creating a dataset from file.")
         if os.path.exists(raw_data_path):
-            bert = 'allenai/longformer-base-4096'
+            bert_name = 'allenai/longformer-base-4096'
             
             with open(raw_data_path, "rb") as f:
-                dataset  = TABDataset(joblib.load(f), label_set = label_set, 
-                                     tokenizer = LongformerTokenizerFast.from_pretrained(bert),
-                                     tokens_per_batch=4096) 
+                dataset  = TABDataset(joblib.load(f), 
+                                        label_set = label_set, 
+                                        tokenizer = LongformerTokenizerFast.from_pretrained(bert_name),
+                                        tokens_per_batch=4096) 
             with open(dataset_path, 'wb') as handle:
                 pickle.dump(dataset, handle, protocol=pickle.HIGHEST_PROTOCOL)
             print("Dataset created and saved.")
@@ -326,7 +529,7 @@ def preprocess_tab_dataset(datapath, create_new = False, class_masking = False, 
 
     return dataset
 
-def get_tab_dataloaders(dataset, train_fraction=0.3, test_fraction=0.3, save_new_dataset = False):
+def get_tab_dataloaders(dataset, train_fraction=0.3, test_fraction=0.3, save_new_dataset = False, batch_size = 2):
    
     dataset_size = len(dataset)
     train_size = int(train_fraction * dataset_size)
@@ -339,8 +542,8 @@ def get_tab_dataloaders(dataset, train_fraction=0.3, test_fraction=0.3, save_new
     train_subset = Subset(dataset, train_indices)
     test_subset = Subset(dataset, test_indices)
     
-    train_loader = DataLoader(train_subset, batch_size=1, collate_fn=dataset.custom_collate_fn, shuffle=True)
-    test_loader = DataLoader(test_subset, batch_size=1, collate_fn=dataset.custom_collate_fn, shuffle=False)
+    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle = True) #collate_fn=dataset.custom_collate_fn, shuffle=True)
+    test_loader = DataLoader(test_subset, batch_size=batch_size, shuffle = True) #collate_fn=dataset.custom_collate_fn, shuffle=False)
     
 
     return train_loader, test_loader
@@ -349,16 +552,18 @@ def get_tab_dataloaders(dataset, train_fraction=0.3, test_fraction=0.3, save_new
 
 def align_tokens_and_annotations_bilou(tokenized: Encoding, annotations, ids, class_masking = False):
     tokens = tokenized.tokens
+    
+
     identifier_types = ["O"] * len(
         tokens
     )
     aligned_labels = ["O"] * len(
         tokens
     )
-    offsets = ["O"] * len(
+    offsets = [-1] * len(
         tokens
     )
-    aligned_entities = ["O"] * len(
+    aligned_entities = [-1] * len(
         tokens
     )
     for anno in annotations:
@@ -383,6 +588,7 @@ def align_tokens_and_annotations_bilou(tokenized: Encoding, annotations, ids, cl
                 offsets[token_ix] = {anno['id'] : (anno['start_offset'], anno['end_offset'])}
                 aligned_entities[token_ix] = anno['entity_type']
 
+  
     return aligned_labels, identifier_types, offsets, ids, aligned_entities
 
 

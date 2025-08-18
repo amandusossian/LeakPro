@@ -101,6 +101,7 @@ class ShadowModelHandler(ModelHandler):
             None
 
         """
+        print("Reached into create sms")
         if num_models < 0:
             raise ValueError("Number of models cannot be negative")
 
