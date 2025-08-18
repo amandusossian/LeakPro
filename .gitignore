@@ -177,3 +177,7 @@ examples/mia/text_mia/tab_data/*.pkl
 
 # Ignore outputs
 leakpro_output/*
+outputs/*
+.npy
+.png
+.svg
