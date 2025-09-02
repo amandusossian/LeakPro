@@ -1,0 +1,39 @@
+2025-08-29 09:19:44,273 INFO     Target model blueprint created from TABBERT in ../mia/text_mia/utils/tabds_model_preparation.py.
+2025-08-29 09:19:44,622 INFO     Loaded target model metadata from ./target/model_metadata.pkl
+/apps/Arch/software/PyTorch/2.1.2-foss-2023a-CUDA-12.1.1/lib/python3.11/site-packages/torch/_utils.py:831: UserWarning: TypedStorage is deprecated. It will be removed in the future and UntypedStorage will be the only storage class. This should only matter to you if you are using storages directly.  To access UntypedStorage directly, use tensor.untyped_storage() instead of tensor.storage()
+  return self.fget.__get__(instance, owner)()
+2025-08-29 09:19:56,628 INFO     Loaded target model from ./target
+2025-08-29 09:20:10,987 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-08-29 09:20:10,987 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-08-29 09:20:10,987 INFO     Creating shadow model handler singleton
+2025-08-29 09:20:11,000 INFO     Creating distillation model handler singleton
+2025-08-29 09:20:11,449 INFO     Added attack: mastermind
+2025-08-29 09:20:11,449 INFO     Preparing attack: mastermind
+2025-08-29 09:20:11,486 INFO     Mask starting with I- label at index 107 in the document 10.
+2025-08-29 09:20:11,524 INFO      Target document trimmed. 3 "hops" were found in the document. 
+2025-08-29 09:20:13,865 INFO     Running attack: mastermind
+2025-08-29 09:20:13,865 INFO     Using bandit approach
+2025-08-29 09:20:13,865 INFO     Using Tsallis inf sampling strategy.
+TABInputHandler initialized.
+  0%|          | 0/100 [00:00<?, ?it/s]  0%|          | 0/100 [00:00<?, ?it/s]
+Traceback (most recent call last):
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/./run_extraction_attack.py", line 14, in <module>
+    leakpro.run_audit()
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/leakpro/leakpro.py", line 131, in run_audit
+    audit_results = self.attack_scheduler.run_attacks()
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/leakpro/attacks/attack_scheduler.py", line 63, in run_attacks
+    result = attack.run_attack()
+             ^^^^^^^^^^^^^^^^^^^
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/mastermind.py", line 383, in run_attack
+    self.run_tsallis_attack()
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/mastermind.py", line 547, in run_tsallis_attack
+    self.observed_rewards.append(self.extraction_game.step())
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/src/games.py", line 174, in step
+    observed_reward = self.get_reward(actions)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/src/games.py", line 158, in get_reward
+    probs_of_masks = self.attack_obj.calculate_confidence_for_masked_tokens(probs = probs_target, 
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: AttackMM.calculate_confidence_for_masked_tokens() got an unexpected keyword argument 'probs'

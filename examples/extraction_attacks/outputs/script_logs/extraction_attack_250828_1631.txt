@@ -1,0 +1,38 @@
+2025-08-28 16:31:17,278 INFO     Target model blueprint created from TABBERT in ../mia/text_mia/utils/tabds_model_preparation.py.
+2025-08-28 16:31:17,360 INFO     Loaded target model metadata from ./target/model_metadata.pkl
+/apps/Arch/software/PyTorch/2.1.2-foss-2023a-CUDA-12.1.1/lib/python3.11/site-packages/torch/_utils.py:831: UserWarning: TypedStorage is deprecated. It will be removed in the future and UntypedStorage will be the only storage class. This should only matter to you if you are using storages directly.  To access UntypedStorage directly, use tensor.untyped_storage() instead of tensor.storage()
+  return self.fget.__get__(instance, owner)()
+2025-08-28 16:31:23,942 INFO     Loaded target model from ./target
+2025-08-28 16:31:38,483 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-08-28 16:31:38,483 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-08-28 16:31:38,483 INFO     Creating shadow model handler singleton
+2025-08-28 16:31:38,489 INFO     Creating distillation model handler singleton
+2025-08-28 16:31:38,757 INFO     Added attack: mastermind
+2025-08-28 16:31:38,757 INFO     Preparing attack: mastermind
+2025-08-28 16:31:38,880 INFO      Target document trimmed. 0 "hops" were found in the document. 
+2025-08-28 16:31:40,809 INFO     Running attack: mastermind
+2025-08-28 16:31:40,809 INFO     Using the random sampling strategy.
+2025-08-28 16:31:40,809 INFO     Multi run averaging begins
+TABInputHandler initialized.
+Traceback (most recent call last):
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/./run_extraction_attack.py", line 14, in <module>
+    leakpro.run_audit()
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/leakpro/leakpro.py", line 131, in run_audit
+    audit_results = self.attack_scheduler.run_attacks()
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/leakpro/attacks/attack_scheduler.py", line 63, in run_attacks
+    result = attack.run_attack()
+             ^^^^^^^^^^^^^^^^^^^
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/mastermind.py", line 364, in run_attack
+    self.run_multi_attack() 
+    ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/mastermind.py", line 433, in run_multi_attack
+    self.run_random_attack()        # Run the random attack, could possibly be changed according to strategy
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/mastermind.py", line 415, in run_random_attack
+    filled_target, guessed_token_ids = self.fill_blanks( indices_of_masks = self.adjusted_indices_of_target_masks, 
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/mastermind.py", line 1213, in fill_blanks
+    'identifier_types' : tensor(filled_doc_identifier_types + padding_to_add*[-1], dtype = int),
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: too many dimensions 'str'

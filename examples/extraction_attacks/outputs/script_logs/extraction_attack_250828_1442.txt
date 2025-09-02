@@ -1,0 +1,27 @@
+2025-08-28 14:42:25,037 INFO     Target model blueprint created from TABBERT in ../mia/text_mia/utils/tabds_model_preparation.py.
+2025-08-28 14:42:25,103 INFO     Loaded target model metadata from ./target/model_metadata.pkl
+/apps/Arch/software/PyTorch/2.1.2-foss-2023a-CUDA-12.1.1/lib/python3.11/site-packages/torch/_utils.py:831: UserWarning: TypedStorage is deprecated. It will be removed in the future and UntypedStorage will be the only storage class. This should only matter to you if you are using storages directly.  To access UntypedStorage directly, use tensor.untyped_storage() instead of tensor.storage()
+  return self.fget.__get__(instance, owner)()
+2025-08-28 14:42:37,808 INFO     Loaded target model from ./target
+2025-08-28 14:42:52,228 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-08-28 14:42:52,228 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-08-28 14:42:52,228 INFO     Creating shadow model handler singleton
+2025-08-28 14:42:52,229 INFO     Creating distillation model handler singleton
+2025-08-28 14:42:52,467 INFO     Added attack: mastermind
+2025-08-28 14:42:52,467 INFO     Preparing attack: mastermind
+TABInputHandler initialized.
+Traceback (most recent call last):
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/./run_extraction_attack.py", line 14, in <module>
+    leakpro.run_audit()
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/leakpro/leakpro.py", line 131, in run_audit
+    audit_results = self.attack_scheduler.run_attacks()
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/leakpro/attacks/attack_scheduler.py", line 59, in run_attacks
+    attack.prepare_attack()
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/mastermind.py", line 214, in prepare_attack
+    self.trim_example() 
+    ^^^^^^^^^^^^^^^^^^^
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/mastermind.py", line 952, in trim_example
+    if entities[iToken] == self.MR_entity:
+                           ^^^^^^^^^^^^^^
+AttributeError: 'AttackMM' object has no attribute 'MR_entity'

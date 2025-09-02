@@ -68,7 +68,7 @@ class PIIPool:
     def load_attack_pool(self, attack_pool_path):
         """
         Load an attack pool from a file.
-        TODO: Consider if this should be added, as there might be not that useful. Maybe load population pool and slice it here instead though.
+        TODO: Consider if this should be added, as it might be not that useful. Maybe load population pool and slice it here instead though.
         attack_pool_path: str
             Path to the file containing the attack pool.
         """

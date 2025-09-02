@@ -1,0 +1,38 @@
+2025-08-28 22:00:45,171 INFO     Target model blueprint created from TABBERT in ../mia/text_mia/utils/tabds_model_preparation.py.
+2025-08-28 22:00:45,172 INFO     Loaded target model metadata from ./target/model_metadata.pkl
+/apps/Arch/software/PyTorch/2.1.2-foss-2023a-CUDA-12.1.1/lib/python3.11/site-packages/torch/_utils.py:831: UserWarning: TypedStorage is deprecated. It will be removed in the future and UntypedStorage will be the only storage class. This should only matter to you if you are using storages directly.  To access UntypedStorage directly, use tensor.untyped_storage() instead of tensor.storage()
+  return self.fget.__get__(instance, owner)()
+2025-08-28 22:00:46,452 INFO     Loaded target model from ./target
+2025-08-28 22:01:00,563 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-08-28 22:01:00,566 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-08-28 22:01:00,569 INFO     Creating shadow model handler singleton
+2025-08-28 22:01:00,571 INFO     Creating distillation model handler singleton
+2025-08-28 22:01:00,732 INFO     Added attack: mastermind
+2025-08-28 22:01:00,735 INFO     Preparing attack: mastermind
+2025-08-28 22:01:00,761 INFO     Mask starting with I- label at index 107 in the document 10.
+2025-08-28 22:01:00,800 INFO      Target document trimmed. 3 "hops" were found in the document. 
+2025-08-28 22:01:02,095 INFO     Running attack: mastermind
+2025-08-28 22:01:02,230 INFO     Using the random sampling strategy.
+2025-08-28 22:01:02,233 INFO     Multi run averaging begins
+2025-08-28 22:01:14,961 INFO     Multi run iteration 1/1 completed.
+2025-08-28 22:01:15,026 INFO     Multi run averaging done!
+TABInputHandler initialized.
+Traceback (most recent call last):
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/./run_extraction_attack.py", line 14, in <module>
+    leakpro.run_audit()
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/leakpro/leakpro.py", line 131, in run_audit
+    audit_results = self.attack_scheduler.run_attacks()
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/leakpro/attacks/attack_scheduler.py", line 63, in run_attacks
+    result = attack.run_attack()
+             ^^^^^^^^^^^^^^^^^^^
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/mastermind.py", line 389, in run_attack
+    self.generate_results()
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/mastermind.py", line 1406, in generate_results
+    self.plot_results(self.plot_res)
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/mastermind.py", line 1431, in plot_results
+    plot_MR_avg_results(self)
+  File "/cephyr/users/reimera/Alvis/projects/LeakPro/examples/extraction_attacks/utils/plot_utils.py", line 500, in plot_MR_avg_results
+    entity_string = entity_int_to_string[target_entity_type]
+                                         ^^^^^^^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'target_entity_type' where it is not associated with a value

@@ -1,0 +1,26 @@
+2025-08-28 22:05:46,623 INFO     Target model blueprint created from TABBERT in ../mia/text_mia/utils/tabds_model_preparation.py.
+2025-08-28 22:05:46,623 INFO     Loaded target model metadata from ./target/model_metadata.pkl
+/apps/Arch/software/PyTorch/2.1.2-foss-2023a-CUDA-12.1.1/lib/python3.11/site-packages/torch/_utils.py:831: UserWarning: TypedStorage is deprecated. It will be removed in the future and UntypedStorage will be the only storage class. This should only matter to you if you are using storages directly.  To access UntypedStorage directly, use tensor.untyped_storage() instead of tensor.storage()
+  return self.fget.__get__(instance, owner)()
+2025-08-28 22:05:47,804 INFO     Loaded target model from ./target
+2025-08-28 22:06:01,993 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-08-28 22:06:01,993 INFO     Loaded population dataset from ../../../tab_data/tab_train_complete_dataset.pkl
+2025-08-28 22:06:01,993 INFO     Creating shadow model handler singleton
+2025-08-28 22:06:01,993 INFO     Creating distillation model handler singleton
+2025-08-28 22:06:02,152 INFO     Added attack: mastermind
+2025-08-28 22:06:02,152 INFO     Preparing attack: mastermind
+2025-08-28 22:06:02,176 INFO     Mask starting with I- label at index 107 in the document 10.
+2025-08-28 22:06:02,211 INFO      Target document trimmed. 3 "hops" were found in the document. 
+2025-08-28 22:06:03,571 INFO     Running attack: mastermind
+2025-08-28 22:06:03,571 INFO     Using the random sampling strategy.
+2025-08-28 22:06:03,571 INFO     Multi run averaging begins
+2025-08-28 22:06:16,260 INFO     Multi run iteration 1/1 completed.
+2025-08-28 22:06:16,260 INFO     Multi run averaging done!
+2025-08-28 22:06:16,412 INFO     Plotted Multi Run Averaging Results.
+2025-08-28 22:06:16,412 INFO     Plotted results generated
+2025-08-28 22:06:16,412 INFO     Results generated
+2025-08-28 22:06:16,412 INFO     Finished attack: mastermind
+2025-08-28 22:06:16,412 INFO     No audit results for mastermind attack as of now, continuing. 
+2025-08-28 22:06:16,412 INFO     Auditing completed
+TABInputHandler initialized.
+PERSON

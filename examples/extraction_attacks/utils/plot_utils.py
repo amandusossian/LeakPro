@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 def plot_info_per_pool(attack_obj):
     for iMask, idxMask in enumerate(attack_obj.indices_of_target_masks):
@@ -314,7 +315,7 @@ def plot_expanding_window_result(attack_obj):
                 confidences[i] = tmp_conf 
 
 
-    window_size = attack_obj.EW_size_history
+    window_size = attack_obj.EW_window_expansions
 
     # Average over window sizes, i.e. group all confidences of the same window size and get the avg. Just to create a nice plot.
     window_plot = []
@@ -356,26 +357,26 @@ def plot_EW_centered_results(attack_obj):
 
     
     original_confidence_of_mask = attack_obj.true_conf[attack_obj.EW_single_entity_actual_mask_idx]
-    plt.plot( attack_obj.EW_size_history, attack_obj.observed_rewards, label = 'Confidence')
-    plt.hlines(original_confidence_of_mask,xmin = attack_obj.EW_size_history[0], xmax = attack_obj.EW_size_history[-1], color = 'orange', linestyles='dashed', label = 'Conf of true mask in full doc' )
+    plt.plot( attack_obj.EW_window_expansions, attack_obj.observed_rewards, label = 'Confidence')
+    plt.hlines(original_confidence_of_mask,xmin = attack_obj.EW_window_expansions[0], xmax = attack_obj.EW_window_expansions[-1], color = 'orange', linestyles='dashed', label = 'Conf of true mask in full doc' )
 
 
+    true_seq = attack_obj.true_input_ids[attack_obj.EW_single_entity_actual_mask_idx]
+    true_string = attack_obj.tokenizer.decode(true_seq)
     
-    if attack_obj.EW_single_entity_replace_mask:
-        mask_seq = attack_obj.EW_centered_replacement_sequence
-        true_seq = attack_obj.true_input_ids[attack_obj.EW_single_entity_actual_mask_idx]
+    if attack_obj.EW_single_entity_replace_target_mask_bool:
+        mask_seq = attack_obj.EW_replacement_sequence
         mask_string = attack_obj.tokenizer.decode(mask_seq)
-        true_string = attack_obj.tokenizer.decode(true_seq)
         
         rep_title_string = f'Mask "{true_string}" replaced by "{mask_string}"\n'  if true_string != mask_string else f'Mask "{mask_string}"\n'
    
-    non_rep_title_string = f'Mask "{attack_obj.tokenizer.decode(attack_obj.true_input_ids[attack_obj.EW_single_entity_actual_mask_idx])}"\n' 
-    entity_string = attack_obj.entity_int_to_string[attack_obj.EW_entity_type]
+    non_rep_title_string = f'Mask "{true_string}"\n' 
+    entity_string = attack_obj.entity_int_to_string[attack_obj.EW_entity_type_int]
 
     plt.title( (
         f'Confidence as window size increases. Entity type {entity_string} \n'
-        f' {rep_title_string if attack_obj.EW_single_entity_replace_mask else non_rep_title_string}'
-        f' Mask idx {attack_obj.EW_single_entity_actual_mask_idx}, nr {attack_obj.EW_single_entity_order_idx + 1} of [{entity_string}]\'s. '
+        f' {rep_title_string if attack_obj.EW_single_entity_replace_target_mask_bool else non_rep_title_string}'
+        f' Mask idx nr {attack_obj.EW_single_entity_actual_mask_idx} in document.'
     ))
     
     
@@ -387,7 +388,120 @@ def plot_EW_centered_results(attack_obj):
     plt.grid()
     plt.legend(loc = 'lower right')
     plt.tight_layout()
-    plt.show()
-    plt.savefig(attack_obj.figpath + f"/EW_centered_{attack_obj.entity_int_to_string[attack_obj.EW_entity_type]}_doc_{attack_obj.target_doc_idx}_n_{attack_obj.EW_single_entity_order_idx}{f'_replaced' if attack_obj.EW_single_entity_replace_mask else '_org'}.svg")
 
+    plt.savefig(attack_obj.figpath + f"/EW_centered_{attack_obj.entity_int_to_string[attack_obj.EW_entity_type_int]}_doc_{attack_obj.target_doc_idx}_mask_pos_{attack_obj.EW_single_entity_actual_mask_idx}{f'_replaced' if attack_obj.EW_single_entity_replace_target_mask_bool else '_org'}.svg")
+
+
+  
+
+def plot_MR_avg_results(attack_obj):
+    """
+    Here we generate the average confidence of a specific mask type
+
+    We first extract the sum of all confidences (avg per doc) for each fraction of 
+    other pii being correct.
+
+    Then these are plotted. 
+
+
+    """
+    path_to_datafolder = attack_obj.MR_path
+    files_to_load = [f for f in os.listdir(path_to_datafolder)]
+    
+    
+    
+    entity_int_to_string = attack_obj.entity_int_to_string
+    conf_target = {}
+    times_seen_fraction = {}
+    target_entity_type = 0
+   
+    target_n_masks_list = []
+    remaining_n_masks_list = []
+    n_runs = len(files_to_load)
+    
+    # For each file (i.e. run on document)
+    for k, file in enumerate(files_to_load):
+        loaded_res = np.load( path_to_datafolder + '/' + file, allow_pickle = True )
+
+        current_res_dict = loaded_res.item()
+        confidences = current_res_dict['observed_rewards']
+       
+        n_masks_of_entity_type = current_res_dict['n_masks_of_target_type']
+        n_masks_in_target = current_res_dict['n_masks_in_target']
+        n_remaining_masks = n_masks_in_target - n_masks_of_entity_type
+        entity_types_of_all_masks = current_res_dict['entity_types']
+       
+        target_entity_type = current_res_dict['target_entity_type']
+   
+        fractions = current_res_dict['fractions']
+       
+        doc_id = current_res_dict['doc_id']
+
+        
+
+        print(f'Processing file nr {k+1}, ran on doc id: {doc_id}')
+        # For all the fractions of remaining masks set to correct
+        for j in range(len(fractions)):
+            
+            # This is the current fraction of the remaining (non-target) masks which were set correct 
+            fraction = fractions[j]
+
+            # Current confidences of all of the masks
+            current_confidences = confidences[j]
+
+            # init/reset tmp values
+            tmp_conf_others = 0
+            tmp_conf_target = 0
+
+            # For all of the tokens in the document:
+            for iMask, confMask in enumerate(current_confidences):
+                
+                # If we're at a token belonging to the target entity type
+                if entity_types_of_all_masks[iMask] == target_entity_type:
+                    tmp_conf_target += confMask # Add the confidence of the target mask
+                
+                # Or one of the others
+                else: 
+                    tmp_conf_others += confMask
+
+
+            # These are not used for now, could be later on. 
+            target_n_masks_list.append(n_masks_of_entity_type)
+            remaining_n_masks_list.append(n_remaining_masks)
+            
+            # If we've seen the current fraction already, we need to add to it and later on divide by the number of times it was investigated!
+            if fraction in conf_target.keys():
+                conf_target[fraction] += tmp_conf_target / n_masks_of_entity_type # Adds the average confidence of the target masks for the specific run
+                times_seen_fraction[fraction] += 1 # Add 1 to the number of times we've seen the current fraction investigated
+
+            # Otherwise, initiate it
+            else: 
+                conf_target[fraction] = tmp_conf_target / n_masks_of_entity_type
+                times_seen_fraction[fraction] = 1
+            
+            
+    
+    #Used for plotting
+    plot_fracs = []
+    plot_confs = []
+    
+    # conf_target is a dict with 
+    # Keys: fraction of non-target type masks are set correct
+    # Vals: List of confidences for that fraction value per run over document
+
+    # Extract the fractions to a list and divide the mean of the confidences with the number of times we've seen that fraction.
+    for total_fraction, total_confidences in conf_target.items():
+        plot_fracs.append(total_fraction)
+        plot_confs.append(np.mean(total_confidences) / times_seen_fraction[total_fraction])
+        
+        
+    plt.plot(plot_fracs, plot_confs)
+    plt.grid()
+    entity_string = entity_int_to_string[target_entity_type]
+    plt.title(f'Average confidence over {n_runs} run(s) for entity type {entity_string}') 
+    print(entity_string)
+    plt.xlabel('Fraction of remaining PII forced correct')
+    plt.ylabel('Confidence')
+    plt.savefig( attack_obj.MR_path+ f'/multi_run_avg_entity_{str(entity_string)}.png')
+    
 

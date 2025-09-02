@@ -155,7 +155,7 @@ class TsallisGame(Game):
 
             # Calculate the softmax logits of the received logits
             probs_target = softmax_logits(logits_target.cpu().numpy())
-            probs_of_masks = self.attack_obj.calculate_confidence_for_masked_tokens(probs = probs_target, 
+            probs_of_masks = self.attack_obj.calculate_confidence_for_masked_tokens(confidences = probs_target, 
                                                                                     i_guess=self.attack_attempt)
             self.attack_obj.confidence_scores[self.attack_attempt] = probs_of_masks
    
