@@ -181,3 +181,5 @@ outputs/*
 *.npy
 *.png
 *.svg
+examples/extraction_attacks/experiment_outputs/
+examples/extraction_attacks/outputs/script_logs/

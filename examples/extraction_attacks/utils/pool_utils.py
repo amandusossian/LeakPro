@@ -23,6 +23,17 @@ class PIIPool:
         if datapath:
             self.create_base_pool(datapath)
 
+    @staticmethod
+    def _entity_type_as_int(entity_type):
+        return entity_type.item() if hasattr(entity_type, "item") else int(entity_type)
+
+    @staticmethod
+    def _find_tensor_index(candidates, true_entity):
+        for idx, candidate in enumerate(candidates):
+            if candidate.shape == true_entity.shape and candidate.equal(true_entity):
+                return idx
+        return None
+
     def create_base_pool(self, datapath):
         """
         Create a pool of data for the extraction attack.
@@ -93,6 +104,7 @@ class PIIPool:
         if self.global_attack_pool_bool:
             self.create_global_pools(target_entities)
         else:
+            self.attack_pool = {}   
             self.create_local_pools(target_entities)
                
 
@@ -103,18 +115,18 @@ class PIIPool:
  
         # First enter all of the target entities into the attack pool
         for i in range(n_target_entities):
-            entity_type = target_entities[i][1].item()
-            import pdb; breakpoint()
+            entity_type = self._entity_type_as_int(target_entities[i][1])
             true_entity = target_entities[i][0]
          
             if entity_type > -1:
                 if entity_type not in self.attack_pool:
                     self.attack_pool[entity_type] = []
-                if true_entity not in self.attack_pool[entity_type]:
+                true_idx = self._find_tensor_index(self.attack_pool[entity_type], true_entity)
+                if true_idx is None:
                     self.attack_pool[entity_type].append(true_entity)
                     self.true_idxs[i] = len(self.attack_pool[entity_type])-1
                 else: 
-                    self.true_idxs[i] = self.attack_pool[entity_type].index(true_entity)
+                    self.true_idxs[i] = true_idx
                 
   
         # Then add some other random entities from the full candidate pool
@@ -122,10 +134,10 @@ class PIIPool:
 
             if self.attack_pool_type == "full":
                 # Add the full base pool to the attack pool
-                self.local_pool[i].append(self.base_pool[entity_type])
+                self.attack_pool[entity_type].extend(self.base_pool[entity_type])
 
             else:
-                for i in range(self.extension):
+                for _ in range(self.extension):
                 
                     entity_id = random.randint(0, len(self.base_pool[entity_type]) - 1)
                     self.attack_pool[entity_type].append(self.base_pool[entity_type][entity_id])
@@ -139,7 +151,7 @@ class PIIPool:
         
         # First enter all of the target entities into the attack pool
         for i in range(n_target_entities):
-            entity_type = target_entities[i][1]
+            entity_type = self._entity_type_as_int(target_entities[i][1])
             true_entity = target_entities[i][0]
          
             if entity_type > -1:
@@ -148,11 +160,11 @@ class PIIPool:
                 self.true_idxs[i] = 0
                 
             else: 
-                print("Entity type is -1, not adding to agent pool")
+                raise ValueError("Entity type is -1, not adding to agent pool (in pool_utils -> create_local_pools).")
 
             if self.attack_pool_type == "full":
                 # Add the full base pool to the attack pool
-                self.local_pool[i].append(self.base_pool[entity_type])
+                self.local_pool[i].extend(self.base_pool[entity_type])
             else:
                 # Add some other random entities from the base pool
                 for j in range(self.extension):
@@ -169,6 +181,7 @@ class PIIPool:
         """
 
         # If a local_pool_id is provided, sample from the specified pool
+        entity_type = self._entity_type_as_int(entity_type)
         if local_pool_id != -1:
             if entity_id == -1: 
                 entity_id = random.randint(0, len(self.local_pool[local_pool_id]) - 1)

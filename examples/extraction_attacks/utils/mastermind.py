@@ -19,6 +19,7 @@ from examples.extraction_attacks.utils.src.games import TsallisGame
 from tqdm import tqdm  
 import matplotlib.pyplot as plt 
 from utils.plot_utils import *
+import os
 
 MODEL_MAX_LEN = 4096
 MODEL_SPECIAL_TOKENS_LEN = 2
@@ -80,7 +81,7 @@ class AttackMM(AbstractMIA):
         
         # Bandit specifics
         self.bandit_parameters = configs.get("bandit_parameters", None) # Parameters for the bandit strategy
-        self.bandit_sampling_alg = configs.get("bandit_alg", "tsallis") # The bandit sampling algorithm to use
+        self.bandit_sampling_alg = configs.get("bandit_sampling_alg", configs.get("bandit_alg", "tsallis")) # The bandit sampling algorithm to use
         
         if self.bandit_parameters and self.bandit_sampling_alg == "tsallis":
             self.tsallis_reward_factor = self.bandit_parameters['tsallis_reward_factor']
@@ -104,10 +105,11 @@ class AttackMM(AbstractMIA):
             self.attack_strategy = "random"
             multi_run_parameters = configs.get('multi_run_parameters', None)
             self.MR_n_docs = configs.get('MR_n_docs', None)
-            self.MR_randomize_doc_ids = configs.get('MR_randomize_doc_ids', None)
+            self.MR_randomize_doc_ids = configs.get('MR_randomize_doc_ids', configs.get('MR_randomize_doc_idxs', None))
             self.MR_entity_type_int = configs.get('MR_entity_type_id', None)
             self.MR_sweep_bool = configs.get('MR_sweep_correct_fraction_bool', None)
             self.MR_doc_id = configs.get('MR_doc_id', None)
+            self.target_doc_idx = self.MR_doc_id
             # Maybe like this, maybe have it evenly spaced out between 0 and 1 in n_runs_per_doc steps
             # Currently evenly spaced.
             
@@ -144,18 +146,18 @@ class AttackMM(AbstractMIA):
         if self.EW_centered_single: 
             self.EW_single_entity_bool = True # Overrides the single entity setting, as the centered single entity is always a single entity investigation
             self.EW_centered_single_current_token_idx = -1                      # The masks token index in the current slice of the document
+            self.attack_strategy = "random" # Overrides the attack strategy to be random, as bandit doesn't make sense here
 
         # Gather context free confidences of the masks in all of the training data
         self.gather_context_free_statistics = configs.get('gather_context_free_statistics', False) # Runs the model on context-free masks from the training data
         self.gather_context_free_statistics_size_extension = configs.get('gather_context_free_statistics_size_extension', 0) # Runs the model on context-free masks from the training data
-            
+        self.gather_stats_two_mask_experiment = configs.get('gather_stats_two_mask_experiment', False) # If true, gathers statistics for one mask dependent on a second mask
+        
         # Set output folder structure
         self.path_to_output = './experiment_outputs/'
         self.experiment_path = self.path_to_output + datetime.today().strftime('%y%m%d') + '/' + datetime.today().strftime('%H%M')+'_' + self.attack_strategy
         if self.gather_context_free_statistics:
-            self.experiment_path = self.experiment_path + '_gather_stats'
-            if self.gather_context_free_statistics_size_extension >0: 
-                self.experiment_path = self.experiment_path + f'_size_ext_{self.gather_context_free_statistics_size_extension}'
+            self.experiment_path = self.experiment_path + '_gather_stats' + f'_size_ext_{self.gather_context_free_statistics_size_extension}'
 
         if not os.path.exists(self.experiment_path):
             os.makedirs(self.experiment_path)   # Creates experiment folder
@@ -202,9 +204,13 @@ class AttackMM(AbstractMIA):
         # Set the tokenizer and target model
         self.target_model = self.handler.target_model
         self.n_tokens_in_target_doc = sum(self.target_example['attention_masks']).item()
-  
-        
-    
+
+        # If true, runs analysis of the training data (saves counts of masks in training docs in a csv file ) and exits
+        collect_data_information = False 
+        if collect_data_information: 
+            self.collect_data_info()
+            raise SystemExit
+          
         # Set the target features and labels, and convert the strings to integers for e_t and i_t
         self.target_features = {
             'input_ids': self.target_example['input_ids'], 
@@ -250,7 +256,7 @@ class AttackMM(AbstractMIA):
                         EW_single_entity_mask_idx = np.random.choice(EW_indices_of_entity_type)
                     else: 
                         
-                        remaining_indices = np.delete(EW_indices_of_entity_type, self.EW_single_entity_mask_idx) # Random excludes the true one
+                        remaining_indices = np.delete(EW_indices_of_entity_type, self.EW_single_entity_mask_idx) # Random excludes the true one in this case
                         EW_single_entity_mask_idx = np.random.choice(remaining_indices)
 
              
@@ -294,16 +300,22 @@ class AttackMM(AbstractMIA):
         self.pool.create_attack_pool(list(zip(self.true_input_ids, self.true_entity_types)))
         self.true_conf = self.get_true_confidences()
         
-        # Specific related to single mask investigation
+        # Specific related to Single Mask Investigation
         if self.single_mask_investigation:
             self.SMI_update_freq = self.n_masks_in_target / self.n_evaluations
             self.SMI_res = np.zeros((2, self.n_evaluations)) # (confidence score, fraction of correct masks) per evaluation
 
 
         if self.multi_run_averaging:
+            indices_of_entity_type = np.where(self.true_entity_types == self.MR_entity_type_int)[0]
+            n_masks_of_entity_type = len(indices_of_entity_type)
+            if n_masks_of_entity_type == 0: 
+                raise ValueError('No masks of target type in document')
+            
+            self.MR_target_idxs = self.adjusted_indices_of_target_masks[indices_of_entity_type]
             
             if self.MR_sweep_bool: 
-                self.MR_correct_fractions = np.arange(0, 1, 1/self.n_evaluations)               # A linear sweep between 0 and 1
+                self.MR_correct_fractions = np.linspace(0, 1, self.n_evaluations)               # A linear sweep between 0 and 1
             else: 
                 self.MR_correct_fractions = self.MR_set_fraction*np.ones(self.n_evaluations)    # The same fraction for all
 
@@ -324,23 +336,26 @@ class AttackMM(AbstractMIA):
     
                     # Sample another entity which is replacing the true mask,
                     # differs from randomly picking which position is replaced.
+
                     self.EW_replacement_sequence = self.pool.sample_from_candidates(self.EW_entity_type_int, entity_id = -1, local_pool_id = self.EW_single_entity_actual_mask_idx)
+                    while self.EW_replacement_sequence.tolist() == self.true_input_ids[self.EW_single_entity_actual_mask_idx].tolist():
+                        self.EW_replacement_sequence = self.pool.sample_from_candidates(self.EW_entity_type_int, entity_id = -1, local_pool_id = self.EW_single_entity_actual_mask_idx)
                     self.EW_replacement_sequence_length = len(self.EW_replacement_sequence)
 
 
             self.EW_actual_token_size_history = np.zeros(self.n_evaluations)            # Keeps track of how long the token segments were
             self.EW_window_expansions = zeros(self.n_evaluations, dtype = int)          # List of how many extra tokens, per side, are included per run, initialized here, created below
 
-            self.create_window_expansion_list(n_increments = self.EW_n_increments)      
-
             self.EW_current_expansion = 0                                               # Tracker of the current expansion
+            self.create_window_expansion_list(n_increments = self.EW_n_increments)      
+   
 
             # Between the start and end, we have : K tokens,  the Mask of interest, K further tokens, where K is the current expansion
             self.EW_current_start = max( 0, self.EW_single_entity_token_idx_in_org -  self.EW_current_expansion )
             self.EW_current_end = min( MODEL_MAX_LEN, self.EW_single_entity_token_idx_in_org + self.EW_single_entity_org_mask_len + self.EW_current_expansion )        # The final included index in the original document  
             
             if self.EW_centered_single: 
-                self.EW_centered_single_current_token_idx = self.EW_current_expansion # The current token idx in the centered single mask attack
+                self.EW_centered_single_current_token_idx = self.EW_current_expansion # The current token idx in the centered single mask attack (Maybe should be plus one, depends on how padding is handled)
 
 
     def run_attack(self):
@@ -351,9 +366,10 @@ class AttackMM(AbstractMIA):
 
         if self.gather_context_free_statistics:
             logger.info('Gathering context-free statistics from the training data')
-            self.gather_statistics()
-            logger.info('Gathering context-free statistics is done.')
-            return
+            self.gather_statistics(self.gather_context_free_statistics_size_extension, self.gather_stats_two_mask_experiment)
+            logger.info('Gathering context-free statistics is done. Exiting.')
+            raise SystemExit
+            # return # Exits after gathering statistics, maybe return is better idk
 
 
         # Random attack
@@ -375,10 +391,9 @@ class AttackMM(AbstractMIA):
             else: 
             
                 self.run_random_attack()
-
                 logger.info("Random Attack Iterations Completed")
 
-        # Bandit Attack TODO: Might need changing if more bandit algorithms are added
+        # Bandit Attack TODO: Change if more bandit algorithms are added
         elif self.attack_strategy == "bandit": 
 
             logger.info("Using bandit approach")
@@ -414,7 +429,9 @@ class AttackMM(AbstractMIA):
                 filled_target = self.generate_EW_filled_target(iAttempt)
             
             elif self.single_mask_investigation:
-                filled_target = self.generate_single_mask_filled_target(iAttempt)
+                filled_target, guessed_token_ids = self.fill_blanks( indices_of_masks = self.adjusted_indices_of_target_masks, 
+                                                        action_list = None )
+                self.guessed_tokens[iAttempt] = guessed_token_ids
             
             else: 
             
@@ -446,41 +463,44 @@ class AttackMM(AbstractMIA):
         if self.MR_counter < self.MR_n_docs:    # Prepare for the next evaluation if we're not done
             self.prepare_attack()               
         
-
+        
     def generate_single_mask_filled_target(self, iAttempt):
-
-
         """
         Generates the filled target for the single mask investigation. 
         Fills in the mask with the correct token, and randomizes the rest of the tokens.
         """
-        
-       
-        single_mask_idx = self.indices_of_target_masks[self.SI_mask_idx] # The token idx in the original document
-        single_mask_len = self.len_of_target_masks[self.SI_mask_idx] # The length of the mask in the original document
+        single_mask_idx = self.indices_of_target_masks[self.SMI_mask_idx] # The token idx in the original document
+        single_mask_len = self.len_of_target_masks[self.SMI_mask_idx] # The length of the mask in the original document
         single_mask_label = self.target_labels[single_mask_idx] # The label of the mask in the original document
-        # Fill in the mask with the correct token
 
         pre_mask = self.target_features['input_ids'][:single_mask_idx]
         post_mask = self.target_features['input_ids'][single_mask_idx + single_mask_len:]
         
-        if self.SI_replace:
-            mask_seq = self.pool.sample_from_candidates(self.EW_entity_type_int, entity_id=-1, local_pool_id=self.SI_mask_idx)
-            self.SI_replaced_mask_length = len(mask_seq)
+        if self.SMI_replace:
+            mask_seq = self.pool.sample_from_candidates(self.EW_entity_type_int, entity_id=-1, local_pool_id=self.SMI_mask_idx)
+            self.SMI_replaced_mask_length = len(mask_seq)
         else:
-            
             # Mask sequence is the correct token for the mask
-            mask_seq = self.true_input_ids[self.SI_mask_idx] # The correct token for the mask
+            mask_seq = self.true_input_ids[self.SMI_mask_idx] # The correct token for the mask
 
         filled_target = {
             'input_ids': cat([tensor([0], dtype=int), pre_mask, mask_seq, post_mask, tensor([2], dtype=int)]), # Add start and end tokens
-            'attention_masks': cat( [ones(len(pre_mask) + len(mask_seq) + len(post_mask) + 2, dtype=int), zeros(MODEL_MAX_LEN  - (len(pre_mask) + len(mask_seq) + len(post_mask) + 2), dtype=int)]) # Add attention masks
+            'attention_masks': cat([ones(len(pre_mask) + len(mask_seq) + len(post_mask) + 2, dtype=int), zeros(MODEL_MAX_LEN  - (len(pre_mask) + len(mask_seq) + len(post_mask) + 2), dtype=int)]) # Add attention masks
         }
-        
-      
         return filled_target
     
 
+    def lock_guess(self, p_lock: int): # Not used
+        """ 
+        Function to lock the the token at ordered position up to, and including, p_lock. 
+        NOTE Not used, not done.
+        """
+
+        assert p_lock <= self.n_masks_in_target, 'Attempt to lock more masks than available'
+
+        best_action_at_p = np.argmax(self.observed_rewards[:][p_lock])
+        self.trimmed_target_example['input_ids'][self.adjusted_indices_of_target_masks[p_lock]] = self.guessed_tokens[best_action_at_p][p_lock]
+    
 
     def calculate_confidence_for_filled_target(self, iAttempt, filled_target):
         """
@@ -498,17 +518,6 @@ class AttackMM(AbstractMIA):
             self.observed_rewards = self.confidence_scores # Differs in case of bandit strategies are used, but the same here
 
 
-    def lock_guess(self, p_lock: int): # Not used
-        """ 
-        Function to lock the the token at ordered position up to, and including, p_lock. 
-        NOTE Not used, not done.
-        """
-
-        assert p_lock <= self.n_masks_in_target, 'Attempt to lock more masks than available'
-
-        best_action_at_p = np.argmax(self.observed_rewards[:][p_lock])
-        self.trimmed_target_example['input_ids'][self.adjusted_indices_of_target_masks[p_lock]] = self.guessed_tokens[best_action_at_p][p_lock]
-    
 
 
 
@@ -575,12 +584,16 @@ class AttackMM(AbstractMIA):
 
             window_start, window_end, window_len = self.adjust_right_increasing_window_size(iAttempt)
 
-        if self.EW_single_entity_set_rest_correct_bool: 
+        if not self.EW_single_entity_set_rest_correct_bool: 
 
             pass # Here we should implement some stuff which randomizes the rest of the tokens in the sequence. 
-        
+
         pre_mask = self.target_features['input_ids'][ window_start : self.EW_single_entity_token_idx_in_org ]
-        post_mask = self.target_features['input_ids'][ self.EW_single_entity_token_idx_in_org + self.EW_single_entity_org_mask_len : window_end + 1 ]
+        if window_end > self.n_tokens_in_target_doc-1:
+            window_end = self.n_tokens_in_target_doc-1
+        if window_start < 1:
+            window_start = 1
+        post_mask = self.target_features['input_ids'][ self.EW_single_entity_token_idx_in_org + self.EW_single_entity_org_mask_len : window_end  ]
         
         if self.EW_single_entity_replace_target_mask_bool: # Replace single mask with another one
             
@@ -628,32 +641,45 @@ class AttackMM(AbstractMIA):
         creates a list of window sizes that goes from 0 to the maximum edge distance in 'n_increments' steps.
         handles both the case of centered expansion and right side only.
         """
-            
-        if self.EW_centered_single: 
-            largest_edge_dist_from_mask = max( self.EW_single_entity_token_idx_in_org, self.n_tokens_in_target_doc - (self.EW_single_entity_token_idx_in_org + self.EW_single_entity_org_mask_len ))
-        else: 
-            largest_edge_dist_from_mask = self.n_tokens_in_target_doc - (self.EW_single_entity_token_idx_in_org + self.EW_single_entity_org_mask_len )
-        
-        
-        
-        increment_size = largest_edge_dist_from_mask // (n_increments - 1)
-        expansions_per_step = self.n_evaluations // n_increments
-        remaining_steps = self.n_evaluations % n_increments 
-
-        start_without_context = True
-
-        if start_without_context: 
-            increment_range = range(n_increments)
+   
+        # max distance to expand
+        if self.EW_centered_single:
+            left = self.EW_single_entity_token_idx_in_org
+            right = self.n_tokens_in_target_doc - (
+                self.EW_single_entity_token_idx_in_org + self.EW_single_entity_org_mask_len
+            )
+            max_dist = max(left, right)
         else:
-            increment_range = range(1, n_increments+1)
+            max_dist = self.n_tokens_in_target_doc - (
+                self.EW_single_entity_token_idx_in_org + self.EW_single_entity_org_mask_len
+            )
 
-        window_expansion = [iIncrement*increment_size for iIncrement in increment_range for _ in range(expansions_per_step)]
-        
-        self.EW_window_expansions = tensor(window_expansion + [ window_expansion[-1] ] * remaining_steps, dtype = int)
-        self.EW_window_expansion_increment = increment_size
-        self.EW_current_expansion = self.EW_window_expansions[0]
-        self.EW_current_start = self.EW_current_expansion 
-        self.EW_current_end = self.EW_current_start + self.EW_single_entity_org_mask_len + self.EW_current_expansion
+        # expansion values at n_increments steps
+        expansions = [int(round(i * max_dist / (n_increments - 1))) for i in range(n_increments)]
+
+        # spread them evenly to fill n_evaluations slots
+        window_expansion = [expansions[int(i * (n_increments - 1) / (self.n_evaluations - 1))]
+                            for i in range(self.n_evaluations)]
+
+        self.EW_window_expansions = tensor(window_expansion, dtype=int)
+
+        # initialize current expansion + start/end
+        expansion = self.EW_window_expansions[0]
+        if self.EW_centered_single:
+            self.EW_current_start = max(0, self.EW_single_entity_token_idx_in_org - expansion)
+            self.EW_current_end = min(
+                self.n_tokens_in_target_doc,
+                self.EW_single_entity_token_idx_in_org + self.EW_single_entity_org_mask_len + expansion,
+            )
+        else:
+            self.EW_current_start = self.EW_single_entity_token_idx_in_org
+            self.EW_current_end = min(
+                self.n_tokens_in_target_doc,
+                self.EW_current_start + self.EW_single_entity_org_mask_len + expansion,
+            )
+
+        self.EW_current_expansion = expansion
+
 
 
 
@@ -683,6 +709,8 @@ class AttackMM(AbstractMIA):
         
             self.EW_centered_single_current_token_idx = self.EW_window_expansions[self.attack_attempt] + 1
         
+
+
         return window_start, window_end, window_len
 
 
@@ -740,6 +768,7 @@ class AttackMM(AbstractMIA):
     
 
     def calculate_confidence_for_masked_tokens(self, confidences: np.ndarray, i_guess: int) -> np.ndarray:
+        
         """
         Calculate the confidence scores for the masked tokens. Depending on the input, either runs a completely correct document,
         a slice of the correct document (expanding window), or the current guesses.
@@ -787,6 +816,8 @@ class AttackMM(AbstractMIA):
             text_doc = self.trimmed_target_example
             res = np.zeros(len(self.guessed_tokens[i_guess]))
 
+        token_offset = 0
+
         # For all of the masks
         for i, idx in enumerate(mask_idxs):
             
@@ -807,14 +838,14 @@ class AttackMM(AbstractMIA):
             else: 
                 other_label = 1
             
-            sum_prev_token_length = 0
+            confidence_idx = idx if calculate_true_conf else idx + token_offset
 
             # Sum the token probabilities of the entire length of the masked sequence, for both B- and I- labels
             
             # For all of the tokens in the masks
             for j in range(mask_lengths[i]):
                 
-                assert idx + j < confidences.shape[0], f"Index {idx+j} is out of bounds for dimension 0 with size {confidences.shape[0]}"
+                assert confidence_idx + j < confidences.shape[0], f"Index {confidence_idx+j} is out of bounds for dimension 0 with size {confidences.shape[0]}"
                 assert token_label < confidences.shape[1], f"Token label {token_label} is out of bounds for dimension 1 with size {confidences.shape[1]}"
                 
             
@@ -824,31 +855,31 @@ class AttackMM(AbstractMIA):
                 if self.exact_matching_confidence:
 
                     if j == 0:
-                        # Add the confidence of being the main token label
-                        res[i] += confidences[ idx + j + sum_prev_token_length, token_label ]
+                        # Add the confidence of being the main token label for the first token in the mask
+                        res[i] += confidences[ confidence_idx + j, token_label ]
                     else:   
-                        # Add the confidence of being the paired for the rest of the tokens
+                        # Add the confidence of being the paired for the rest of the tokens ( Should be I- label tho, we don't reverse the labeling scheme even if they start with I-)
                         if 0 <= token_label + other_label < confidences.shape[1]:
-                            res[i] += confidences[ idx + j + sum_prev_token_length, token_label + other_label ]
+                            res[i] += confidences[ confidence_idx + j, token_label + other_label ]
                 else: 
 
-                    res[i] += confidences[ idx + j + sum_prev_token_length, token_label ] 
+                    res[i] += confidences[ confidence_idx + j, token_label ] 
                     
                     if 0 <= token_label + other_label < confidences.shape[1]:
-                        res[i] += confidences[ idx + j + sum_prev_token_length, token_label + other_label ]
+                        res[i] += confidences[ confidence_idx + j, token_label + other_label ]
             
             res[i] /= mask_lengths[i] # Divide the current confidence by the number of tokens in the mask
 
 
             if not calculate_true_conf:            
-                sum_prev_token_length += mask_lengths[i] # Keep track of the number of tokens seen, for EW
+                token_offset += mask_lengths[i] - 1
             
             if self.expanding_window and (not calculate_true_conf):
                 # For the right side expanding window 
                 
                 if not self.EW_centered_single:
                 
-                    if idx + sum_prev_token_length > self.EW_current_size: #If we're outside of the current window, stop and return
+                    if idx + token_offset > self.EW_current_size: #If we're outside of the current window, stop and return
                 
                         return res[:i+1]
 
@@ -894,7 +925,7 @@ class AttackMM(AbstractMIA):
         Fetch the best candidates from the confidence scores.
         """
 
-        # Not sure if good enough. 
+        # Not used
         best_candidates = np.argmax(self.confidence_scores, axis=0)
         return best_candidates
 
@@ -903,17 +934,16 @@ class AttackMM(AbstractMIA):
     def trim_example(self):
         """
         
-        Trim the training example to remove sensitive informaiton. Creates the blank document which is filled in later on during
-        the attack. 
+        Trim the training example to remove sensitive informaiton, collects the masks & info about them. 
+        Creates the blank document which is filled in later on during the attack. 
         
         For example, if a PII is multiple tokens long, they are merged, as:
-        " ... his name is [B-PERSON (Firstname)] [I-PERSON (Lastname)] "  -> becomes ->  "... his name is [B-PERSON]" .
+        " ... his name is [B-PERSON (Firstname)] [I-PERSON (Lastname)]... "  -> becomes ->  "... his name is [B-PERSON] ..." .
 
-   
         """
 
         text_labels = self.target_example['labels']
-        att_mask = self.target_example["attention_masks"]
+        att_mask = self.target_example['attention_masks']
         entities = self.target_example['entity_types']
         indices_to_keep = []
         indices_of_masks = []
@@ -1008,7 +1038,7 @@ class AttackMM(AbstractMIA):
                 len_of_current_mask = 0
                 indices_to_keep.append(iToken)
 
-        logger.info(f' Target document trimmed. {n_mask_hops} "hops" were found in the document. ')
+        logger.info(f'Target document (doc id {self.target_doc_idx}) trimmed. {n_mask_hops} "hops" were found in the document. ')
         
         # set the trimmed target example 
         self.trimmed_target_example = { 'input_ids' : self.target_example["input_ids"][indices_to_keep],  # The ids of the tokens
@@ -1024,7 +1054,7 @@ class AttackMM(AbstractMIA):
         
         if self.multi_run_averaging:
             self.MR_target_n = len(self.MR_target_idxs)
-            self.MR_remaining_masks = n_masks_in_doc - self.MR_target_n # How many remaining masks there are
+            self.MR_n_remaining_masks = n_masks_in_doc - self.MR_target_n # How many remaining masks there are which are not of the target type
 
         
         
@@ -1063,17 +1093,18 @@ class AttackMM(AbstractMIA):
             q = self.attack_attempt / self.n_evaluations 
             n_to_fix = min( self.n_masks_in_target, int( q * self.n_masks_in_target ) )
             current_forced_correct = range( n_to_fix )
+            self.n_corr_per_guess[self.attack_attempt] = len(set(current_forced_correct) | {self.SMI_mask_idx})
 
 
         
         if self.multi_run_averaging:
             # sample a fraction of the samples of the remaining ones to be correct, leave rest true
-            n_forced_correct = int(self.MR_correct_fractions[self.attack_attempt]*self.MR_remaining_masks)
+            n_forced_correct = int(self.MR_correct_fractions[self.attack_attempt]*self.MR_n_remaining_masks)
             
-            true_fraction_correct = n_forced_correct / self.MR_remaining_masks
+            true_fraction_correct = n_forced_correct / self.MR_n_remaining_masks
             self.MR_actual_correct_fractions.append(true_fraction_correct) # Solves issue of different percentages giving same nr of forced correct
-            indices_to_set_correct = np.random.choice(range(self.MR_remaining_masks), n_forced_correct) # TODO: combine with EW experiment, need to make sure they are not larger than the indices in the current window 
-            remaining_indices = np.array(list(set(self.indices_of_target_masks) - set(self.MR_target_idxs)))
+            indices_to_set_correct = np.random.choice(range(self.MR_n_remaining_masks), n_forced_correct, replace = False) # TODO: combine with EW experiment, need to make sure they are not larger than the indices in the current window 
+            remaining_indices = np.array(sorted(set(self.adjusted_indices_of_target_masks) - set(self.MR_target_idxs)))
             
             if len(indices_to_set_correct) != 0:
                 indices_to_set_correct = remaining_indices[indices_to_set_correct]
@@ -1083,7 +1114,7 @@ class AttackMM(AbstractMIA):
             
             
             if self.expanding_window: 
-                if token_idx > self.EW_current_size: # If we're outside of the expanding window, break the loop. 
+                if token_idx > self.EW_current_end: # If we're outside of the expanding window, break the loop. 
                     break
 
             # Integer labels for the Beginning- and In-tokens
@@ -1100,7 +1131,7 @@ class AttackMM(AbstractMIA):
                 entity_to_sample = -1 # Otherwise, random selection
 
             if self.single_mask_investigation: # If we're investigating a single specific mask 
-                if (iMask in current_forced_correct ) or (iMask == self.single_mask_idx) : # If it's the specified mask, or in the forced true ones, set the action to be the true one
+                if (iMask in current_forced_correct ) or (iMask == self.SMI_mask_idx) : # If it's the specified mask, or in the forced true ones, set the action to be the true one
                     entity_to_sample = self.pool.true_idxs[iMask]
             
             
@@ -1123,7 +1154,7 @@ class AttackMM(AbstractMIA):
                 
                 # Otherwise, with prob self.multi_run_random_fraction, set the remaining masks as either true or random.
                 else: 
-                    if iMask in indices_to_set_correct:
+                    if self.adjusted_indices_of_target_masks[iMask] in indices_to_set_correct:
                         entity_to_sample = self.pool.true_idxs[iMask]
                     else: 
                         entity_to_sample = -1
@@ -1134,7 +1165,7 @@ class AttackMM(AbstractMIA):
                 if self.EW_single_entity_bool:
                 
                     if self.EW_single_entity_actual_mask_idx == iMask:
-                
+                        
                         entity_to_sample = self.pool.true_idxs[iMask]
                 
                     else:
@@ -1206,8 +1237,8 @@ class AttackMM(AbstractMIA):
         
         # Add the padding to the filled document. If it's negative, we've created a too long sequence somehow. 
         padding_to_add = max_token_len - len(filled_doc_ids)
-        
-        assert padding_to_add >= 0, f'The token list is too long. '  
+
+        assert padding_to_add >= 0, f'The filled document is too long. '  
 
 
 
@@ -1221,7 +1252,9 @@ class AttackMM(AbstractMIA):
                             'entity_types' : tensor(filled_doc_entity_types + padding_to_add*[-1], dtype = int)}
         
         self.attack_attempt += 1
-
+        if self.attack_attempt == self.n_evaluations: 
+            #breakpoint()
+            pass
         return filled_text_example, chosen_tokens
     
 
@@ -1245,15 +1278,70 @@ class AttackMM(AbstractMIA):
 
 # ------------------------- SAVE & ANALYSIS FUNCTIONS -------------------------
     
-    def gather_statistics(self, extra_tokens_per_side = None):
+    def collect_data_info(self):
+        # Print how many masks per type are in each document in the population
         
-        """ Gather statistics about the confidence of the masks withouth any context"""
+
+        self.data_max_n_tokens = 0
+        self.data_max_n_masks = 0
+        self.data_n_tokens = []
+        self.data_n_masks = []
+        self.population_length = len(self.handler.population)
+        logger.info(f"Collecting info about the population of {self.population_length} examples.")
+        
+        with open(self.path_to_output + "/population_info_mod2.txt", "w") as f:
+            for i in range(self.population_length):
+                example = self.handler.population[i]
+                n_tokens = sum(example['attention_masks']).item()
+                n_masks = (example['labels'] %2 != 0).sum().item()
+
+                self.data_n_tokens.append(n_tokens)
+                self.data_n_masks.append(n_masks)
+                if n_masks > self.data_max_n_masks:
+                    self.data_max_n_masks = n_masks
+                if n_tokens > self.data_max_n_tokens:
+                    self.data_max_n_tokens = n_tokens
+            
+                entity_types, counts = np.unique(np.array(example['entity_types'])[example['labels'] %2 != 0], return_counts=True)
+                entity_count_dict = {etype: 0 for etype in range(8)}
+                for etype, count in zip(entity_types, counts):
+                    entity_count_dict[etype] = count    
+                # Fix the following line
+
+                entity_counts_str = ", ".join(
+                    f"{self.entity_int_to_string[key]}: {val}"
+                    for key, val in entity_count_dict.items()
+                )
+
+                f.write(
+                    f"Document {i}, n_tokens = {n_tokens}, n_masks = {n_masks}, entity_counts, {entity_counts_str}\n"
+                )
+
+
+
+        logger.info(f"Population info saved to {self.path_to_output}/population_info_mod2.txt")
+        logger.info(f"Max tokens in a document: {self.data_max_n_tokens}, Max masks in a document: {self.data_max_n_masks}")
+
+
+
+    def gather_statistics(self, extra_tokens_per_side = 0, two_mask_experiment = False):
+        
+        """ 
+        Gather statistics about the confidence of the masks withouth any context, or of the first mask with a second one varying.
+        
+        """
     
-        
-        n_total_docs = 20 #self.population_length
+        single_doc = False # If true, only investigate a single document, otherwise all of them.
+        if single_doc:
+            n_total_docs = 1
+            doc_idx_list = [self.target_doc_idx]
+        else:   
+            n_total_docs = self.population_length
+            doc_idx_list = list(range(n_total_docs))
+
         true_probs_of_all = []
         entity_wise_probs = {}
-
+        true_probs_two_mask = {}
         first_mask_records = []
 
         target_model = self.target_model.to(self.device)
@@ -1261,18 +1349,18 @@ class AttackMM(AbstractMIA):
         n_diff_docs = 0
         n_seen_masks = 0
         true_probs_of_all_dict = {}
-        for iEntityType in range(8):
-            true_probs_of_all_dict[iEntityType] = []
+        
 
         with no_grad():
 
             for iDoc in tqdm(range(n_total_docs)):
-                
-                self.target_doc_idx = iDoc
+             
+                index_of_doc = doc_idx_list[iDoc]
+                self.target_doc_idx = index_of_doc
                 self.target_example = self.handler.population[self.target_doc_idx]
             
                 if (self.target_example['labels'] > 16).any(): 
-                    print('Out of reach labels found in doc ', iDoc)
+                    print('Out of reach labels found in doc ', index_of_doc)
                     continue
                
                 self.trim_example()
@@ -1280,138 +1368,181 @@ class AttackMM(AbstractMIA):
                 self.true_input_ids = cat((self.target_example['input_ids'], ones(MODEL_MAX_LEN  - len_of_target_example, dtype = int)))
                 self.true_entity_types = cat( (tensor(self.target_example['entity_types'], dtype = int), -1*ones(MODEL_MAX_LEN  - len_of_target_example, dtype = int))) # Add -1 for the padding at the end, so that the shape is correct
 
-
                 # A way of making sure we don't investigate the same doument multiple times, REMEMBER however that there are multiple annotations per document
                 first_mask = self.target_example['input_ids'][self.indices_of_target_masks[0]:self.indices_of_target_masks[0] + self.len_of_target_masks[0]]
                 first_mask_hash =  first_mask.cpu().numpy().tobytes() # Convert to bytes for hashing
                 
+                # If we've already seen this mask, skip the document, otherwise save the hash
                 if first_mask_hash in first_mask_records: 
                     continue
+                # We've reached a new document
+
+                first_mask_records.append(first_mask_hash)
+                n_diff_docs += 1
+                n_seen_masks += self.n_masks_in_target
+                self.n_tokens_in_target_doc = sum(self.target_example['attention_masks']).item()
                 
-                else:
-             
-                    self.n_tokens_in_target_doc = sum(self.target_example['attention_masks']).item()
-                    first_mask_records.append(first_mask_hash)
+                # Get the logits from the model for the true input, and save in a relevant dictionary
+                current_true_entity_types = np.array(self.target_example['entity_types'])[self.indices_of_target_masks]
+                self.pool.create_attack_pool(list(zip(self.true_input_ids, current_true_entity_types)))
+
+                true_probs = self.get_true_confidences()
+                
+                if not two_mask_experiment: # In this case we're saving info later on regarding the true confidences, so save some compute by passing this part
                     
-                    
-                    # TODO save the entity types of the true probabilities. 
-                    current_true_entity_types = np.array(self.target_example['entity_types'])[self.indices_of_target_masks]
-                    true_probs = self.get_true_confidences()
                     for entity_type, true_conf in zip(current_true_entity_types, true_probs):
+                        if entity_type not in true_probs_of_all_dict.keys():
+                            true_probs_of_all_dict[entity_type] = []
+
                         true_probs_of_all_dict[entity_type].append(true_conf)
 
-                    true_probs_of_all.append(self.get_true_confidences())
-                    # We've reached a new document
-                    n_diff_docs += 1
-                    n_seen_masks += self.n_masks_in_target
-             
-                    for iMask in range(self.n_masks_in_target): # For each mask in the document, extract the context-free confidence
-                            
-                        # Retrieve info related to the mask
-                        current_mask_token_idx = self.indices_of_target_masks[iMask]
-                        len_of_current_mask = self.len_of_target_masks[iMask]
-                        current_entity_type = self.true_entity_types[current_mask_token_idx].item()
-                        current_label = self.target_example['labels'][current_mask_token_idx].item()
+                true_probs_of_all.append(true_probs)
+                
+            
+                for iMask in range(self.n_masks_in_target): # For each mask in the document, extract the context-free confidence
+                        
+                    # Retrieve info related to the mask
+                    current_mask_token_idx = self.indices_of_target_masks[iMask]
+                    len_of_current_mask = self.len_of_target_masks[iMask]
+                    current_entity_type = self.true_entity_types[current_mask_token_idx].item()
+                    current_label = self.target_example['labels'][current_mask_token_idx].item()
+                    other_label = 1 if current_label % 2 == 1 else -1
+                    
+                    
+                    # Create a masked sequence which is only the mask with padding 
+                    
+                    #TODO Here we add extra funcitonality of static increment of window size. 
+                    start_of_mask_idx = self.indices_of_target_masks[iMask]
+                    end_of_mask_idx = self.indices_of_target_masks[iMask] + self.len_of_target_masks[iMask] 
+                    
+                    
+                    if extra_tokens_per_side and (not two_mask_experiment): 
+                        
+                        start_when_expanded = max(1, start_of_mask_idx - extra_tokens_per_side)
+                        end_when_expanded = min(self.n_tokens_in_target_doc-1, start_of_mask_idx + len_of_current_mask + extra_tokens_per_side)
 
                         
-
-                        # Create a masked sequence which is only the mask with padding 
                         
-                        #TODO Here we add extra funcitonality of static increment of window size. 
-                        start_input = self.indices_of_target_masks[iMask]
-                        end_input = self.indices_of_target_masks[iMask] + self.len_of_target_masks[iMask] 
+                
+                        mask_idx_in_expanded = start_of_mask_idx - start_when_expanded +1 # How many extra tokens where added to the side
+                        padding_to_add = MODEL_MAX_LEN  - (end_when_expanded - start_when_expanded+ 2)
                         
-                        if extra_tokens_per_side: 
-                            left_increase, right_increase = extra_tokens_per_side, extra_tokens_per_side
-                           
-                            if start_input - left_increase <=0:  # start_input has overshot to the left
-                                left_increase = start_input - 1
+                        masked_seq = self.target_example['input_ids'][start_when_expanded:end_when_expanded].clone().detach()
+                        input_ids = cat( [ tensor([0], dtype = int), masked_seq, tensor([2], dtype = int), ones(padding_to_add, dtype = int) ] )
+                        attention_mask = cat([ones(MODEL_MAX_LEN  - padding_to_add, dtype = int), zeros(padding_to_add, dtype = int) ])
+                        # Extract the confidence
+                        logits_from_model = self.target_model(input_ids = input_ids.unsqueeze(0).to(self.device), attention_mask = attention_mask.unsqueeze(0).to(self.device))
+                        probs_from_model = softmax_logits(logits_from_model[0][mask_idx_in_expanded:mask_idx_in_expanded + len_of_current_mask].cpu().numpy())
+                    
+                    
+                    elif two_mask_experiment:
 
-                            if end_input + right_increase >= self.n_tokens_in_target_doc:
-                                right_increase = self.n_tokens_in_target_doc - end_input - 1    
+                        # Should sample another random mask to fill the second mask with
+                        if iMask < self.n_masks_in_target -1: # If we're not at the last mask
+                            
+                            for iSamples in range(2):# First, get the true confidence of the current mask, then the random one
 
+                                if iSamples == 0: # First sample is the true one
+                                    random_sampling = 0
+                                else: 
+                                    random_sampling = -1 # Random sampling from the pools
 
                             
-                            
-                        padding_to_add = MODEL_MAX_LEN  - (end_input - start_input + 2)
+                                next_mask_token_idx = self.indices_of_target_masks[iMask + 1]
+                                next_mask_entity_type = self.true_entity_types[next_mask_token_idx].item()
 
-                        masked_seq = self.target_example['input_ids'][start_input:end_input].clone().detach()
+                                new_sample = self.pool.sample_from_candidates(entity_type = next_mask_entity_type, entity_id = random_sampling, local_pool_id = iMask+1)
+
+                                new_sample_len = new_sample.numel()
+                                # Unsqueeze if the new sample is 1D
+                                if new_sample.dim() == 0:
+                                    new_sample = new_sample.unsqueeze(0) 
+                                # The sequence is from the start of the current mask to the end of the next mask
+                                start_of_two_mask_seq = start_of_mask_idx   
+                                end_of_two_mask_seq = next_mask_token_idx + new_sample_len
+
+                                len_of_two_mask_seq = end_of_two_mask_seq - start_of_two_mask_seq
+
+                                padding_to_add = MODEL_MAX_LEN  - (len_of_two_mask_seq + MODEL_SPECIAL_TOKENS_LEN)
+                                masked_seq = self.target_example['input_ids'][start_of_two_mask_seq:next_mask_token_idx].clone().detach()
+                                input_ids = cat( [ tensor([MODEL_START_TOKEN], dtype = int), masked_seq, new_sample ,tensor([MODEL_END_TOKEN], dtype = int), ones(padding_to_add, dtype = int) ] )
+                                attention_mask = cat([ones(MODEL_MAX_LEN  - padding_to_add, dtype = int), zeros(padding_to_add, dtype = int) ])
+                                logits_from_model = self.target_model(input_ids = input_ids.unsqueeze(0).to(self.device), attention_mask = attention_mask.unsqueeze(0).to(self.device))
+                                probs_from_model = softmax_logits(logits_from_model[0][1:1+len_of_current_mask].cpu().numpy())
+
+                    
+                                if iSamples == 0:
+                                    if len(probs_from_model.shape) < 2: # If the model doesn't output probabilities for both B- and I- labels, skip this mask
+                                        current_true_confidence = np.sum( probs_from_model[current_label] + probs_from_model[current_label + other_label]) / len_of_current_mask # Average confidence of the mask
+                                    
+                                    else: 
+                                        current_true_confidence = np.sum( probs_from_model[:, current_label] + probs_from_model[:, current_label + other_label]) / len_of_current_mask 
+                                else: 
+                                    if len(probs_from_model.shape) < 2: # If the model doesn't output probabilities for both B- and I- labels, skip this mask
+                                        
+                                        current_confidence = np.sum( probs_from_model[current_label] + probs_from_model[current_label + other_label]) / len_of_current_mask # Average confidence of the mask
+                                    
+                                    else: 
+                                        current_confidence = np.sum( probs_from_model[:, current_label] + probs_from_model[:, current_label + other_label]) / len_of_current_mask # Average confidence of the mask
+                                
+                        
+                        else: 
+                            break                       
+                    else: 
+                    
+                    
+                        padding_to_add = MODEL_MAX_LEN  - (len_of_current_mask + 2)
+                        masked_seq = self.target_example['input_ids'][start_of_mask_idx:start_of_mask_idx + len_of_current_mask].clone().detach()
                         input_ids = cat( [ tensor([0], dtype = int), masked_seq, tensor([2], dtype = int), ones(padding_to_add, dtype = int) ] )
                         attention_mask = cat([ones(MODEL_MAX_LEN  - padding_to_add, dtype = int), zeros(padding_to_add, dtype = int) ])
 
-                        # Extract the confidence
                         logits_from_model = self.target_model(input_ids = input_ids.unsqueeze(0).to(self.device), attention_mask = attention_mask.unsqueeze(0).to(self.device))
-                        probs_from_model = softmax_logits(logits_from_model[0][start_input:start_input+len_of_current_mask].cpu().numpy())
-                        
-                        if current_label % 2 == 0: 
-                            other_label = -1
-                        else: 
-                            other_label = 1
-
-                        if len(probs_from_model.shape) < 2: # If the model doesn't output probabilities for both B- and I- labels, skip this mask
-                            
-                            current_confidence = np.sum( probs_from_model[current_label] + probs_from_model[current_label + other_label]) / len_of_current_mask # Average confidence of the mask
-                        
-                        else: 
-                            current_confidence = np.sum( probs_from_model[:, current_label] + probs_from_model[:, current_label + other_label]) / len_of_current_mask # Average confidence of the mask
+                        probs_from_model = softmax_logits(logits_from_model[0][1:1+len_of_current_mask].cpu().numpy())
                     
 
+                    if len(probs_from_model.shape) < 2: # If the model doesn't output probabilities for both B- and I- labels, skip this mask
+                        
+                        current_confidence = np.sum( probs_from_model[current_label] + probs_from_model[current_label + other_label]) / len_of_current_mask # Average confidence of the mask
+                    
+                    else: 
+                        current_confidence = np.sum( probs_from_model[:, current_label] + probs_from_model[:, current_label + other_label]) / len_of_current_mask # Average confidence of the mask
+                
+                    # Save the confidence to the dict (Different keys for the different cases)
+                    if two_mask_experiment:
+                        two_mask_key = str(current_entity_type) + '_' + str(next_mask_entity_type)
+                        if two_mask_key not in entity_wise_probs.keys():
+                            entity_wise_probs[two_mask_key] = []
+                            true_probs_two_mask[two_mask_key] = []
+                        entity_wise_probs[two_mask_key].append(current_confidence)
+                        true_probs_two_mask[two_mask_key].append(current_true_confidence)
+                    else: 
+                            
                         if current_entity_type not in entity_wise_probs.keys():
                             entity_wise_probs[current_entity_type] = [] 
 
                         entity_wise_probs[current_entity_type].append(current_confidence)
         
+        
         # Save results
+        if two_mask_experiment:
+            np.save(self.experiment_path + f'/true_probs_of_all_two_mask_exp_dict_all_docs.npy', true_probs_two_mask)
+            np.save(self.experiment_path + f'/entity_wise_probs_two_mask_exp_all_docs.npy', entity_wise_probs)
         
-        np.save(self.experiment_path + f'/true_probs_of_all_dict.npy', true_probs_of_all_dict)
-        np.save(self.experiment_path + f'/entity_wise_probs.npy', entity_wise_probs)
-
-        true_probs_of_all = [prob for doc in true_probs_of_all for prob in doc] # Flattening of a nested list. 
-        print('n_seen_masks:', n_seen_masks)
-        print('n_seen_docs:', n_diff_docs)
+        else: 
+            if single_doc:
+                true_prob_save_path = self.experiment_path + f'/true_probs_of_all_dict_doc_{index_of_doc}.npy'
+                entity_wise_save_path = self.experiment_path + f'/entity_wise_probs_doc_{index_of_doc}.npy'
+            else: 
+                true_prob_save_path = self.experiment_path + f'/true_probs_of_all_dict_all_docs.npy'
+                entity_wise_save_path = self.experiment_path + f'/entity_wise_probs_dict_all_docs.npy'
         
-        # Make histogram of the true confidences
-        plt.figure()
-        plt.hist(true_probs_of_all, bins = 100, density = True, alpha = 0.5, label = 'Confidences')
-        title_string1 = f'True Confidences of the masks in the full documents. \n{n_seen_masks} masks, taken from {n_diff_docs} documents.'
-        plt.title(title_string1)
-        plt.grid()     
-        plt.legend()
-        plt.savefig( self.figpath + 'true_probs_histogram.svg')
+            np.save(true_prob_save_path, true_probs_of_all_dict)
+            np.save(entity_wise_save_path, entity_wise_probs)
         
-        # Make histogram of confidences of context free masks
+        if self.plot_res:
+
+            plot_gather_stats_results(self, two_mask_experiment, n_seen_masks, n_diff_docs, entity_wise_probs, true_probs_of_all)
         
-        entity_labels, entity_hist = zip(*entity_wise_probs.items())
-        entity_labels = [self.entity_int_to_string[el] for el in entity_labels]
-
-
-        plt.figure()
-        plt.hist([e for entity_conf in entity_hist for e in entity_conf], bins = 100, density = True, alpha = 0.5, label = 'Confidences')
-        plt.grid()        
-        plt.legend()
-        title_string2 = f'Context-free confidences of the masks. \n {n_seen_masks} masks, taken from {n_diff_docs} documents.'
-        plt.title(title_string2)
-        plt.savefig( self.figpath + 'context_free_confidence_histogram.svg')
-
-        
-        plt.figure()
-        plt.hist(entity_hist, bins = 100, density = True, stacked = True, alpha=0.5, label = entity_labels)
-        title_string3 = f'Context-free confidences of the masks by entity type. \n {n_seen_masks} masks, taken from {n_diff_docs} documents.'
-        plt.title(title_string3)
-        plt.legend()
-        plt.grid() 
-        plt.savefig( self.figpath + 'context_free_confidence_entity_wise_histogram.svg')
-
-        filtered_pairs = [( hist, label) for label, hist in zip(entity_labels, entity_hist) if label != "DATETIME"]
-        entity_hist_no_datetime, entity_labels_no_datetime = zip(*filtered_pairs)
-
-        plt.figure()
-        plt.hist(entity_hist_no_datetime, bins = 100, density = True, stacked = True, alpha=0.5, label = entity_labels_no_datetime)
-        title_string4 = f'Context-free confidences of the masks by entity type, without DATETIME. \n {n_seen_masks} masks, taken from {n_diff_docs} documents.'
-        plt.title(title_string4)
-        plt.legend()
-        plt.grid() 
-        plt.savefig( self.figpath + 'context_free_confidence_entity_wise_histogram_no_datetime.svg')
 
 
         logger.info(f'Gathered statistics done. Investigated {n_diff_docs} different documets out of {self.population_length} in total (different annotations ignored).')
@@ -1511,7 +1642,7 @@ class AttackMM(AbstractMIA):
                      'initial_doc_id': self.MR_doc_id,
                     'all_doc_ids': self.MR_docs_used }
         
-        np.save(self.experiment_path + "/mra_res_meta_info")
+        np.save(self.experiment_path + "/mra_res_meta_info", meta_info)
         
     def print_summary(self) -> None:
         """
@@ -1532,18 +1663,22 @@ class AttackMM(AbstractMIA):
         top_count_per_action = 0
         for i in range(self.n_masks_in_target): # For each masked position
             
-            if self.attack_strategy == "bandit" and False:
+            if self.attack_strategy == "bandit":
                 rewards_per_action = self.extraction_game.players[i].get_policy()
             else:
                 rewards_per_action = [self.confidence_scores[j][i] for j in range(self.n_evaluations)]
             # print the top 5 guesses and the true word
            
-            top_count[i] = min(top_count[i], len(rewards_per_action)-1) 
+            top_count[i] = min(top_count[i], len(rewards_per_action)-1)
+            top_n = int(top_count[i])
 
 
             # NOTE: These actions taken for the top rewards are not unique, i.e. the top actions can all be the same
-            top_five_guesses = np.argsort(rewards_per_action)[-top_count[i]:][::-1]
-            top_five_ids = [self.actions_taken[j][i] for j in top_five_guesses]
+            top_five_guesses = np.argsort(rewards_per_action)[-top_n:][::-1]
+            if self.attack_strategy == "bandit":
+                top_five_ids = top_five_guesses
+            else:
+                top_five_ids = [self.actions_taken[j][i] for j in top_five_guesses]
             
             individual_action_reward = False
             if individual_action_reward: 

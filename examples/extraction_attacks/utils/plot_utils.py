@@ -262,14 +262,14 @@ def plot_single_mask_results(attack_obj):
     """
     Plots confidence over time as a function of how many guesses are correct
     """
-    confidence = [attack_obj.confidence_scores[i][attack_obj.single_mask_idx] for i in range(attack_obj.n_evaluations)] # Extracts the confidence of the specific sample
+    confidence = [attack_obj.confidence_scores[i][attack_obj.SMI_mask_idx] for i in range(attack_obj.n_evaluations)] # Extracts the confidence of the specific sample
     n_correct_masks = [i for i in attack_obj.n_corr_per_guess]
 
     sorted_indices = np.argsort(n_correct_masks)
     x_plot = [n_correct_masks[i] for i in sorted_indices]
     y_plot = [confidence[i] for i in sorted_indices]
     plt.plot(x_plot, y_plot, 'o')
-    plt.title(f'Confidence of mask nr {attack_obj.single_mask_idx} as number of correct masks increases. \nIn full document, {attack_obj.true_conf[attack_obj.single_mask_idx]:.6f} ')
+    plt.title(f'Confidence of mask nr {attack_obj.SMI_mask_idx} as number of correct masks increases. \nIn full document, {attack_obj.true_conf[attack_obj.SMI_mask_idx]:.6f} ')
     plt.xlabel('number of forced correct masks')
     plt.ylabel('Confidence')
     plt.grid()
@@ -505,3 +505,53 @@ def plot_MR_avg_results(attack_obj):
     plt.savefig( attack_obj.MR_path+ f'/multi_run_avg_entity_{str(entity_string)}.png')
     
 
+def plot_gather_stats_results(attack_obj, two_mask_experiment, n_seen_masks, n_diff_docs, entity_wise_probs, true_probs_of_all):
+    """
+    Plots the histograms of the true probabilities of the entities in the pool
+    """
+    
+    if two_mask_experiment: 
+        
+        true_probs_of_all = [prob for doc in true_probs_of_all for prob in doc] # Flattening of a nested list. 
+        
+        # Make histogram of the true confidences
+        plt.figure()
+        plt.hist(true_probs_of_all, bins = 100, density = True, alpha = 0.5, label = 'Confidences')
+        title_string1 = f'True Confidences of the masks in the full documents. \n{n_seen_masks} masks, taken from {n_diff_docs} documents.'
+        plt.title(title_string1)
+        plt.grid()     
+        plt.legend()
+        plt.savefig( attack_obj.figpath + '/true_probs_histogram.svg')
+        
+        # Make histogram of confidences of context free masks
+        entity_labels, entity_hist = zip(*entity_wise_probs.items())
+        entity_labels = [attack_obj.entity_int_to_string[el] for el in entity_labels]
+
+
+        plt.figure()
+        plt.hist([e for entity_conf in entity_hist for e in entity_conf], bins = 100, density = True, alpha = 0.5, label = 'Confidences')
+        plt.grid()        
+        plt.legend()
+        title_string2 = f'Context-free confidences of the masks. \n {n_seen_masks} masks, taken from {n_diff_docs} documents.'
+        plt.title(title_string2)
+        plt.savefig( attack_obj.figpath + '/context_free_confidence_histogram.svg')
+
+        
+        plt.figure()
+        plt.hist(entity_hist, bins = 100, density = True, stacked = True, alpha=0.5, label = entity_labels)
+        title_string3 = f'Context-free confidences of the masks by entity type. \n {n_seen_masks} masks, taken from {n_diff_docs} documents.'
+        plt.title(title_string3)
+        plt.legend()
+        plt.grid() 
+        plt.savefig( attack_obj.figpath + '/context_free_confidence_entity_wise_histogram.svg')
+
+        filtered_pairs = [( hist, label) for label, hist in zip(entity_labels, entity_hist) if label != "DATETIME"]
+        entity_hist_no_datetime, entity_labels_no_datetime = zip(*filtered_pairs)
+
+        plt.figure()
+        plt.hist(entity_hist_no_datetime, bins = 100, density = True, stacked = True, alpha=0.5, label = entity_labels_no_datetime)
+        title_string4 = f'Context-free confidences of the masks by entity type, without DATETIME. \n {n_seen_masks} masks, taken from {n_diff_docs} documents.'
+        plt.title(title_string4)
+        plt.legend()
+        plt.grid() 
+        plt.savefig( attack_obj.figpath + '/context_free_confidence_entity_wise_histogram_no_datetime.svg')

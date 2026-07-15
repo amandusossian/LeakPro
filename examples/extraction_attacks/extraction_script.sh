@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -A NAISS2025-5-150 -p alvis
-#SBATCH --time=0-03:00:00
-#SBATCH -N 1 --gpus-per-node V100:1
+#SBATCH --time=0-06:00:00
+#SBATCH -N 1 --gpus-per-node A40:1
 #SBATCH --output=/dev/null
 # Max parameter values
 # gpu 4, cpu 40, time 2-00:00:00, 117 GB

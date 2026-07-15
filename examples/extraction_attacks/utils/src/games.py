@@ -126,7 +126,10 @@ class TsallisGame(Game):
 
         self.attack_obj.actions_taken[self.attack_attempt] = selected_pii_actions
         
-        n_correct_guesses = sum( int(x == y) for x, y in zip(selected_pii_actions, self.correct_idxs) )
+        n_correct_guesses = sum(
+            int(action_idx == self.correct_idxs[i])
+            for i, action_idx in enumerate(selected_pii_actions)
+        )
 
         self.n_matches[self.attack_attempt] = n_correct_guesses
 
